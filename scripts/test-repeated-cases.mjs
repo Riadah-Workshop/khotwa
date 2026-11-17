@@ -1,0 +1,33 @@
+import assert from 'node:assert/strict';import fs from 'node:fs';import ts from 'typescript';
+const modules=new Map();function load(file){if(modules.has(file))return modules.get(file);const exports={};modules.set(file,exports);new Function('require','exports',ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(()=>load('lib/honor-candidates.ts'),exports);return exports;}
+const {repeatedStudents,repetitionCategory}=load('lib/repeated-cases.ts');
+const students=Array.from({length:5},(_,i)=>({id:'student-'+i,name:'طالب اختبار '+i,grade:'الرابع',classroom:'أ',active:i===4?0:1}));
+let seq=0;const make=(studentId,type,extra={})=>({id:'case-'+seq++,studentId,type,occurredAt:'2026-10-01T04:00:00Z',details:'تفاصيل محفوظة',...extra});
+const cases=[];for(let i=0;i<5;i++)cases.push(make('student-0','المخالفات السلوكية'));for(let i=0;i<5;i++)cases.push(make('student-1','التأخر الصباحي'));cases.push(make('student-1','الملاحظات'));
+for(const type of ['المخالفات السلوكية','التأخر الصباحي','الاستئذان','التواصل مع ولي الأمر','زيارة ولي الأمر','الملاحظات','الاستئذان'])cases.push(make('student-2',type,type==='زيارة ولي الأمر'?{extra:JSON.stringify({visitReason:'استدعاء إدارة المدرسة'})}:{}));
+for(let i=0;i<8;i++){cases.push(make('student-3','السلوك الإيجابي'));cases.push(make('student-3','الغياب'));cases.push(make('student-4','المخالفات السلوكية'));}
+cases.push(make('student-0','المخالفات السلوكية',{deletedAt:'2026-10-02'}));cases.push({...cases[0]});
+const before=JSON.stringify({students,cases}),rows=repeatedStudents(students,cases);
+assert.deepEqual(rows.map(r=>r.id),['student-0','student-1']);assert.equal(rows[0].total,5);assert.equal(rows[1].total,5);assert.equal(rows[1].counts.notes,1);assert.deepEqual(rows[1].repeatedTypes,[{type:'التأخر الصباحي',count:5}]);
+assert.equal(rows.some(r=>r.id==='student-2'),false,'mixed categories never combine to threshold');assert.equal(rows.some(r=>r.id==='student-3'),false,'positive and absence excluded');assert.equal(rows.some(r=>r.id==='student-4'),false,'inactive excluded');assert.equal(JSON.stringify({students,cases}),before,'no record changes');
+const pupil=[students[0]],test=(types)=>repeatedStudents(pupil,types.map(t=>make('student-0',t)));
+assert.equal(test(Array(3).fill('الاستئذان')).length,0);
+assert.equal(test(Array(4).fill('الاستئذان'))[0].repeatedTypes[0].count,4,'inclusive threshold four');
+assert.equal(test(['التأخر الصباحي','التأخر الصباحي','التأخر عن دخول الحصة','التأخر عن دخول الحصة']).length,0,'morning and lesson lateness independent');
+assert.equal(test(['الاستئذان','الاستئذان','التواصل مع ولي الأمر','التواصل مع ولي الأمر']).length,0);
+assert.equal(test(Array(12).fill('الملاحظات')).length,0,'notes never qualify');
+const three=Array.from({length:3},()=>make('student-0','الاستئذان'));
+assert.equal(repeatedStudents(pupil,[...three,{...three[0]},make('student-0','الاستئذان',{deletedAt:'deleted'})]).length,0,'duplicate or deleted cannot reach four');
+const both=test([...Array(4).fill('الاستئذان'),...Array(6).fill('المخالفات السلوكية')]);assert.equal(both[0].repeatedTypes.length,2);assert.equal(both[0].maxRepeat,6);
+assert.equal(repetitionCategory(make('student-1','زيارة ولي الأمر',{extra:JSON.stringify({visitReason:'استفسار عن مستوى الطالب'})})),null);assert.equal(repetitionCategory(make('student-1','استدعاء ولي الأمر')),'summons');
+console.log('Passed: inclusive >=4 same-type threshold; mixed types and distinct lateness do not combine; notes supplemental; duplicate/deleted/absence/positive/inactive excluded; all qualifying types exposed; inputs unchanged.');
+const {studentsByCaseType,caseRankingCsv,rankingCaseType,CASE_RANKINGS}=load('lib/repeated-cases.ts');
+const splitCases=[];for(let i=0;i<4;i++)splitCases.push(make('student-0','الاستئذان'));for(let i=0;i<6;i++)splitCases.push(make('student-1','الاستئذان'));for(let i=0;i<20;i++)splitCases.push(make('student-0','المخالفات السلوكية'));for(let i=0;i<3;i++)splitCases.push(make('student-1','التأخر الصباحي'));for(let i=0;i<5;i++)splitCases.push(make('student-0','التأخر عن دخول الحصة'));
+const permission=studentsByCaseType(students,splitCases,'الاستئذان');assert.deepEqual(permission.map(s=>[s.id,s.count]),[['student-1',6],['student-0',4]]);assert.ok(permission.every(s=>s.records.every(c=>c.type==='الاستئذان')));assert.equal(studentsByCaseType(students,splitCases,'المخالفات السلوكية')[0].count,20);assert.equal(studentsByCaseType(students,splitCases,'التأخر الصباحي')[0].count,3);assert.equal(studentsByCaseType(students,splitCases,'التأخر عن دخول الحصة')[0].count,5);assert.equal(studentsByCaseType(students,splitCases,'الاستئذان',{threshold:5}).length,1);
+assert.equal(studentsByCaseType(students,[...splitCases,splitCases[0],make('student-0','الاستئذان',{deletedAt:'deleted'})],'الاستئذان')[1].count,4);
+assert.equal(studentsByCaseType(students,[make('student-0','الاستئذان',{occurredAt:'2026-10-01T22:00:00Z'})],'الاستئذان',{from:'2026-10-02',to:'2026-10-02'})[0].count,1);
+assert.equal(studentsByCaseType(students,splitCases,'الاستئذان',{from:'2026-11-01'}).length,0);assert.equal(studentsByCaseType(students,splitCases,'الاستئذان',{grade:'الخامس'}).length,0);
+const equal=[make('student-0','الاستئذان'),make('student-1','الاستئذان'),...Array.from({length:30},()=>make('student-1','الملاحظات'))];assert.deepEqual(studentsByCaseType(students,equal,'الاستئذان').map(s=>s.id),['student-0','student-1'],'other categories do not break ties');
+const csv=caseRankingCsv(permission,'الاستئذان');assert.ok(!csv.includes('المخالفات السلوكية'));assert.ok(!csv.includes('مجموع الحالات'));assert.match(caseRankingCsv([{...permission[0],name:'=SUM(1)'}],'الاستئذان'),/"'=SUM/);
+assert.equal(rankingCaseType(make('student-0','زيارة ولي الأمر',{extra:JSON.stringify({visitReason:'استدعاء إدارة المدرسة'})})),'استدعاء ولي الأمر');assert.equal(rankingCaseType(make('student-0','زيارة ولي الأمر',{extra:JSON.stringify({visitReason:'استفسار'})})),'زيارة ولي الأمر');assert.equal(CASE_RANKINGS.length,9);
+console.log('Independent rankings passed: permission, behavior, morning and lesson lateness stay separate; ties ignore other types; threshold/date/grade filters; deduplication; summons partition; CSV only selected type.');

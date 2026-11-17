@@ -1,0 +1,24 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';import ts from 'typescript';
+const exports={};new Function('exports',ts.transpileModule(fs.readFileSync('lib/client-api.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(exports);
+const {readApiResponse,requestApi,ApiResponseError}=exports;
+const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'content-type':'application/json'}});
+const html=()=>new Response('<!DOCTYPE html>',{headers:{'content-type':'text/html'}});
+await assert.rejects(readApiResponse(html()),e=>e instanceof ApiResponseError&&!e.reauthenticate&&e.retryable);
+await assert.rejects(readApiResponse(json({error:'طلب غير مسموح'},403)),e=>!e.reauthenticate&&e.message==='طلب غير مسموح');
+let calls=0;globalThis.fetch=async()=>++calls===1?json({},401):json({students:[]});assert.deepEqual(await requestApi('/api/data'),{students:[]});assert.equal(calls,2);
+calls=0;globalThis.fetch=async()=>{calls++;return json({},401)};await assert.rejects(requestApi('/api/data'),e=>e.reauthenticate);assert.equal(calls,2);
+calls=0;globalThis.fetch=async()=>{calls++;return html()};await assert.rejects(requestApi('/api/data',{method:'POST'}),e=>!e.reauthenticate);assert.equal(calls,1,'writes must never be retried');
+const source=ts.createSourceFile('dashboard.tsx',fs.readFileSync('app/dashboard.tsx','utf8'),ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);const dashboard=source.statements.find(n=>ts.isFunctionDeclaration(n)&&n.name?.text==='Dashboard');const fn=dashboard.body.statements.find(n=>ts.isFunctionDeclaration(n)&&n.name?.text==='load');
+const code=ts.transpile(fn.getText(source),{target:ts.ScriptTarget.ES2022});
+const run=new Function('assert','ApiResponseError',`return (async()=>{let loading=false,needsLogin=false,error='',notice='',data={students:['original']},calls=0,resolve;
+const loadRequest={current:null},hasData={current:true},settingsDirty={current:true},setSettingsForm=()=>{},setLoading=x=>loading=x,setNeedsLogin=x=>needsLogin=x,setRefreshNotice=x=>notice=x,setData=x=>data=x,setError=x=>error=typeof x==='function'?x(error):x;
+let requestApi=async()=>{calls++;return new Promise(r=>resolve=r)};
+${code}
+const one=load(true),two=load(true);assert.equal(calls,1);assert.equal(loading,false);resolve({students:[],cases:[],settings:{},user:{name:'test'}});await Promise.all([one,two]);assert.equal(loadRequest.current,null);
+requestApi=async()=>{throw new ApiResponseError('connection',false,true)};await load(true);assert.equal(needsLogin,false);assert.equal(error,'');assert.ok(notice);assert.deepEqual(data.students,[]);
+requestApi=async()=>{throw new ApiResponseError('تعذّر التحقق من جلسة الدخول',true)};await load(true);assert.equal(needsLogin,false);assert.equal(error,'');await load(false);assert.equal(needsLogin,true);
+requestApi=async()=>({students:[],cases:[],settings:{},user:{name:'test'}});await load(true);assert.equal(needsLogin,false);assert.equal(error,'');assert.equal(notice,'');
+})()`);
+await run(assert,ApiResponseError);
+console.log('Session/network distinction, recovery, background single-flight refresh, data retention, and no repeated writes passed');

@@ -1,0 +1,26 @@
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+import ts from 'typescript';
+const exports={};
+new Function('exports',ts.transpileModule(fs.readFileSync('lib/student-file-cards.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(exports);
+const {fileCardPages,fileCardRoster}=exports;
+const students=Array.from({length:14},(_,i)=>({id:String(i),name:'أحمد '+i,grade:i<7?'الرابع':'الخامس',classroom:i%2?'ب':'أ',phone:i===0?'':'050 000 0000',guardian:'ولي أمر',active:i===13?0:1}));
+const before=JSON.stringify(students);
+assert.deepEqual(fileCardPages(students,new Set()),[]);
+const pages=fileCardPages(students,new Set(students.map(s=>s.id)));
+assert.deepEqual(pages.map(p=>p.length),[13]);
+assert.equal(new Set(pages.flat().map(s=>s.id)).size,13);
+assert.ok(!pages.flat().some(s=>s.id==='13'));
+assert.equal(fileCardRoster(students,'الرابع','أ').length,4);
+assert.equal(fileCardRoster(students,'','','احمد').length,13);
+assert.equal(fileCardRoster(students,'','','050 000 0000').length,12);
+const selected=new Set(['0','8']);
+assert.deepEqual(fileCardPages(students,selected).flat().map(s=>s.id),['0','8']);
+assert.equal(pages.flat().find(s=>s.id==='0').phone,'');
+assert.equal(pages.flat().find(s=>s.id==='1').phone,'050 000 0000');
+assert.equal(JSON.stringify(students),before);
+students[0].name='اسم معدل';
+assert.notEqual(pages.flat().find(s=>s.id==='0').name,students[0].name);
+console.log('Student file cards passed: selected active students only, 16 per page, filters, exact phones, no source mutation and stable preview snapshots.');
+
+assert.deepEqual(fileCardPages(Array.from({length:43},(_,i)=>({...students[1],id:String(i)})),new Set(Array.from({length:43},(_,i)=>String(i)))).map(p=>p.length),[16,16,11]);
