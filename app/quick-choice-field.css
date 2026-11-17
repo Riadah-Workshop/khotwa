@@ -1,0 +1,23 @@
+/* Shortcuts replace dropdowns; native radios keep validation and keyboard support. */
+.quick-choice-field{margin:0 0 18px;min-width:0;border:0;padding:0}
+.quick-choice-field>legend{display:block;font-size:16px;font-weight:700;color:var(--section-accent,#365c48);margin-bottom:9px;padding:0;line-height:1.8}
+.quick-choice-options{display:flex;flex-wrap:wrap;gap:8px}
+.quick-choice-option{position:relative;display:flex;align-items:center;min-height:46px;flex:1 1 110px;margin:0;cursor:pointer;border:1px solid #cbded2;border-radius:12px;background:#f7fbf8;color:#3c6650;line-height:1.65}
+.quick-choice-option>input[type=radio]{position:absolute;opacity:0;width:1px;height:1px;margin:0;padding:0;min-height:0;border:0}
+.quick-choice-option>span{display:block;width:100%;padding:11px 13px;text-align:center;font-size:15px;font-weight:400;margin:0;color:inherit;overflow-wrap:anywhere}
+.quick-choice-option.chosen{background:var(--section-accent,#246b45);border-color:var(--section-accent,#246b45);color:white;box-shadow:0 3px 8px #244b3517}
+.quick-choice-option:focus-within{outline:3px solid #32779a;outline-offset:3px}
+.quick-choice-field:disabled .quick-choice-option{opacity:.55;cursor:not-allowed}
+.quick-choice-more{margin-top:9px}
+.quick-choice-more>summary{cursor:pointer;min-height:44px;padding:9px 11px;border:1px dashed #bbd3c4;border-radius:10px;color:#486d57;background:#fafcfb;font-size:14px;line-height:1.8}
+.quick-choice-more>.quick-choice-options{margin-top:9px}
+.quick-choice-more .quick-choice-option{flex-basis:160px}
+.compact-choice .quick-choice-option{flex-basis:50px}
+.quick-choice-field[data-field-tone=grade] .quick-choice-option{border-color:#b8d3f0;background:#edf5ff;color:#2466a8}
+.quick-choice-field[data-field-tone=classroom] .quick-choice-option{border-color:#d6c6ee;background:#f5f0fc;color:#7653a6}
+.quick-choice-field[data-field-tone=grade] .quick-choice-option.chosen{background:#2466a8;color:white;border-color:#2466a8}
+.quick-choice-field[data-field-tone=classroom] .quick-choice-option.chosen{background:#7653a6;color:white;border-color:#7653a6}
+@media(max-width:650px){.quick-choice-options{gap:7px}.quick-choice-option{flex-basis:110px}.quick-choice-option>span{font-size:15px;padding:10px}.compact-choice .quick-choice-option{flex-basis:45px}}
+@media(forced-colors:active){.quick-choice-option.chosen{outline:2px solid Highlight}.quick-choice-option:has(input:checked)>span{text-decoration:underline}}
+/* Identity-field input styling must not enlarge the visually hidden radio. */
+.app-shell .field.quick-choice-field input[type=radio]{position:absolute;opacity:0;width:1px;height:1px;min-height:0;min-width:0;margin:0;padding:0;border:0;border-radius:0;box-shadow:none}

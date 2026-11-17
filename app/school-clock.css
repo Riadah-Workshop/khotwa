@@ -1,0 +1,43 @@
+@media screen{
+ .app-shell .topbar:has(.school-clock){flex-wrap:wrap;gap:12px;padding-block:14px;height:auto}
+ .school-clock{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr) auto;gap:18px;flex:0 0 100%;width:100%;padding:13px 17px;background:#f2f7f3;border:1px solid #d9e5dc;border-radius:13px;color:#284e3a}
+ .school-clock>div{min-width:0;display:flex;align-items:center;gap:10px}
+ .school-clock>div>div,.school-clock-gregorian{display:flex;flex-direction:column;justify-content:center;align-items:flex-start;gap:3px}
+ .school-clock span{display:block;font-size:12px;line-height:1.8;color:#5b7262}
+ .school-clock strong{display:block;font-size:17px;line-height:1.9;font-weight:700;overflow-wrap:anywhere}
+ .school-clock time{font-size:15px;line-height:1.9;font-variant-numeric:tabular-nums}
+ .school-clock-time time{display:block;min-width:120px;font-size:18px;font-weight:700;white-space:nowrap}
+ .school-clock>div.school-clock-gregorian{align-items:flex-start;gap:3px}
+ @media(max-width:760px){
+  .app-shell .topbar:has(.school-clock){padding-inline:12px;gap:10px}
+  .school-clock{grid-template-columns:minmax(0,1fr) auto;gap:10px;padding:12px}
+  .school-clock-hijri{grid-column:1/-1;border-bottom:1px solid #dbe6dd;padding-bottom:9px}
+  .school-clock strong{font-size:16px}
+  .school-clock time{font-size:14px}
+  .school-clock-time time{font-size:16px;min-width:110px}
+  .school-clock span{font-size:11px}
+ }
+}
+/* The dial shares the Saudi-time source with the digital clock. */
+@media screen{
+ .school-clock{background:linear-gradient(115deg,#fbfdfb,#eef5f0);border-color:#d7dfca;box-shadow:inset 0 1px 0 #fff,0 4px 14px #24463408}
+ .school-clock>div.school-clock-time{padding-inline-start:15px;border-inline-start:1px solid #d8dfcc;gap:13px}
+ .luxury-clock-face{width:76px;height:76px;flex:0 0 auto;padding:3px;border-radius:50%;background:linear-gradient(135deg,#b8dbec,#31789b 40%,#aed6ea 65%,#2b7aa1);box-shadow:0 4px 12px #172f2426,inset 0 1px 1px #fff8}
+ .luxury-clock-face svg{display:block;width:100%;height:100%;border-radius:50%;background:radial-gradient(circle at 34% 25%,#285d4a,#123c2c 68%,#0d2d23);box-shadow:inset 0 1px 6px #0005}
+ .luxury-clock-ring{fill:none;stroke:#79b6d4;stroke-width:.65;opacity:.8}
+ .clock-mark{stroke:#88b3c8;stroke-width:1.1;stroke-linecap:round}.clock-mark.major{stroke:#aed6ea;stroke-width:2}
+ .clock-signature{font-family:inherit;font-size:8px;fill:#8ec1da}
+ .clock-hand{stroke-linecap:round}.hour-hand{stroke:#a6d1e7;stroke-width:4}.minute-hand{stroke:#e4f1f8;stroke-width:2.4}.second-hand{stroke:#5babd3;stroke-width:1}
+ .clock-hand-pin{fill:#a4d1e7;stroke:#387594;stroke-width:1}
+ .school-clock-time time{color:#17452f;font-weight:700;letter-spacing:.5px}
+ @media(max-width:760px){
+  .luxury-clock-face{width:60px;height:60px;padding:3px}
+  .school-clock>div.school-clock-time{padding-inline-start:9px;gap:9px}
+  .school-clock-time time{font-size:16px;min-width:105px}
+ }
+ @media(max-width:360px){
+  .luxury-clock-face{width:48px;height:48px}
+  .school-clock>div.school-clock-time{gap:6px;padding-inline-start:7px}
+  .school-clock-time time{font-size:15px;min-width:98px}
+ }
+}

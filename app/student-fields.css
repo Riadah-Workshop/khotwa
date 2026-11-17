@@ -1,0 +1,55 @@
+/* Student identity cards share the approved grade / classroom / name palette. */
+.app-shell .field[data-field-tone="grade"],
+.app-shell select[aria-label="الصف"]{
+  --field-accent:#2466a8;--field-soft:#edf5ff;--identity-border:#b8d3f0;
+}
+.app-shell .field[data-field-tone="classroom"],
+.app-shell select[aria-label="الفصل"]{
+  --field-accent:#7653a6;--field-soft:#f5f0fc;--identity-border:#d6c6ee;
+}
+.app-shell .field[data-field-tone="student"]{
+  --field-accent:#147662;--field-soft:#edf9f4;--identity-border:#b6dfcf;
+}
+.app-shell .field:is([data-field-tone="grade"],[data-field-tone="classroom"],[data-field-tone="student"]){
+  padding:18px;border:1px solid var(--identity-border);border-radius:18px;
+  background:var(--field-soft);min-width:0;
+}
+.app-shell .field:is([data-field-tone="grade"],[data-field-tone="classroom"],[data-field-tone="student"])>span{
+  display:flex;align-items:center;gap:10px;color:var(--field-accent);
+  font-size:16px;font-weight:700;margin-bottom:14px;
+}
+.app-shell .field:is([data-field-tone="grade"],[data-field-tone="classroom"],[data-field-tone="student"])>span::before{
+  content:"";display:block;flex:none;width:8px;height:22px;
+  border-radius:8px;background:var(--field-accent);
+}
+.app-shell .field:is([data-field-tone="grade"],[data-field-tone="classroom"],[data-field-tone="student"]) :is(input,select){
+  min-height:52px;border:1px solid var(--identity-border);border-radius:12px;
+  padding:10px 13px;background:#fff;color:#34455a;font-size:16px;
+}
+.app-shell .field:is([data-field-tone="grade"],[data-field-tone="classroom"],[data-field-tone="student"]) select,
+.app-shell select:is([aria-label="الصف"],[aria-label="الفصل"]){
+  appearance:none;padding-inline-end:38px;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath d='m4 6 4 4 4-4' fill='none' stroke='%23556479' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:left 13px center;
+}
+.app-shell select:is([aria-label="الصف"],[aria-label="الفصل"]){
+  min-height:52px;border:1px solid var(--identity-border);border-radius:12px;
+  background-color:var(--field-soft);color:var(--field-accent);font-size:16px;
+}
+.app-shell .field:is([data-field-tone="grade"],[data-field-tone="classroom"],[data-field-tone="student"]) :is(input,select):focus-visible,
+.app-shell select:is([aria-label="الصف"],[aria-label="الفصل"]):focus-visible{
+  outline:3px solid var(--field-accent);outline-offset:3px;box-shadow:none;
+}
+.app-shell .field:is([data-field-tone="grade"],[data-field-tone="classroom"],[data-field-tone="student"]) :is(input,select):disabled{
+  background-color:#f7f8f9;color:#637067;cursor:not-allowed;
+}
+@media(max-width:760px){
+  .app-shell .field:is([data-field-tone="grade"],[data-field-tone="classroom"],[data-field-tone="student"]){padding:16px;max-width:100%}
+  .app-shell select:is([aria-label="الصف"],[aria-label="الفصل"]){max-width:100%;min-width:0}
+}
+@media print{
+  .app-shell .field:is([data-field-tone="grade"],[data-field-tone="classroom"],[data-field-tone="student"]){background:white;border:1px solid #ddd;padding:6px;box-shadow:none}
+  .app-shell .field:is([data-field-tone="grade"],[data-field-tone="classroom"],[data-field-tone="student"])>span{color:black}
+  .app-shell .field:is([data-field-tone="grade"],[data-field-tone="classroom"],[data-field-tone="student"])>span::before{display:none}
+  .app-shell select:is([aria-label="الصف"],[aria-label="الفصل"]){color:black;background-color:white}
+}
