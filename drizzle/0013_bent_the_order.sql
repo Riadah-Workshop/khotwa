@@ -1,0 +1,1 @@
+ALTER TABLE `school_evidence` ADD `case_id` text REFERENCES cases(id);
