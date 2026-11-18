@@ -1,0 +1,3 @@
+// A concise manager-facing copy; never changes the original stored message.
+export function compactPrintText(value:string|undefined,max:number){const text=(value||'').replace(/\s+/g,' ').trim();if(text.length<=max)return text;const cut=text.slice(0,max-1),word=cut.lastIndexOf(' ');return cut.slice(0,word>max*.7?word:cut.length).trimEnd()+'…';}
+export function messagePrintSummary<T extends {studentName:string;teacherName?:string;details:string;notes:string;actor:string}>(m:T){return {...m,studentName:compactPrintText(m.studentName,80),teacherName:compactPrintText(m.teacherName,60),details:compactPrintText(m.details,420),notes:compactPrintText(m.notes,240),actor:compactPrintText(m.actor,60)};}
