@@ -1,8 +1,0 @@
-export function studentReportData(studentId:string,data:{cases:{id:string;studentId:string;type:string;occurredAt:string;deletedAt?:string;details:string;action:string;outcome:string;followStatus:string;extra?:string}[];attendance:{studentId:string;roundId:string;date:string;status:string;updatedAt:string;notes:string}[];attendanceRounds:{id:string;completed:number}[];followups:{id:string;caseId:string;createdAt:string;outcome:string;status:string}[];absenceEvents:{id:string;studentId:string;createdAt:string;notes:string;kind:string}[]}){
- const cases=data.cases.filter(c=>c.studentId===studentId&&!c.deletedAt).sort((a,b)=>a.occurredAt.localeCompare(b.occurredAt));
- const ids=new Set(cases.map(c=>c.id)),approved=new Set(data.attendanceRounds.filter(r=>r.completed).map(r=>r.id));
- const daily=new Map<string,typeof data.attendance[number]>();
- for(const r of data.attendance){if(r.studentId!==studentId||!approved.has(r.roundId))continue;const old=daily.get(r.date);if(!old||r.updatedAt>old.updatedAt||(r.updatedAt===old.updatedAt&&r.status!=='absent'))daily.set(r.date,r);}
- const attendance=[...daily.values()].filter(r=>r.status==='absent'||r.status==='late').sort((a,b)=>a.date.localeCompare(b.date));
- return {cases,attendance,absences:attendance.filter(r=>r.status==='absent').length,lateDays:attendance.filter(r=>r.status==='late').length,violations:cases.filter(c=>c.type==='المخالفات السلوكية').length,followups:data.followups.filter(f=>ids.has(f.caseId)).sort((a,b)=>a.createdAt.localeCompare(b.createdAt)),absenceEvents:data.absenceEvents.filter(f=>f.studentId===studentId).sort((a,b)=>a.createdAt.localeCompare(b.createdAt))};
-}
