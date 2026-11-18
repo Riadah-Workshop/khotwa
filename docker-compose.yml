@@ -1,0 +1,35 @@
+# Git-based Docker Compose app in Coolify. TESTING ONLY: Wrangler local simulator.
+services:
+  khotwa:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    init: true
+    stop_grace_period: 30s
+    environment:
+      KHOTWA_ADMIN_EMAIL: ${KHOTWA_ADMIN_EMAIL:?Set KHOTWA_ADMIN_EMAIL in Coolify}
+      KHOTWA_ADMIN_PASSWORD_HASH: ${KHOTWA_ADMIN_PASSWORD_HASH:?Set KHOTWA_ADMIN_PASSWORD_HASH in Coolify}
+      KHOTWA_SESSION_SECRET: ${KHOTWA_SESSION_SECRET:?Set KHOTWA_SESSION_SECRET in Coolify}
+      # Explicit public origins for CSRF validation behind the Coolify proxy.
+      KHOTWA_PUBLIC_ORIGINS: ${KHOTWA_PUBLIC_ORIGINS:-https://khotwa-ksa.com,https://www.khotwa-ksa.com}
+      # Previously omitted: pass optional integrations through to the Worker.
+      # Leave blank if a separate portal/service has not been configured.
+      VISITOR_PORTAL_URL: ${VISITOR_PORTAL_URL:-}
+      VISITOR_ADMIN_KEY: ${VISITOR_ADMIN_KEY:-}
+      PARENT_SERVICE_KEY: ${PARENT_SERVICE_KEY:-}
+      BACKUP_EXPORT_KEY: ${BACKUP_EXPORT_KEY:-}
+      BACKUP_EXPORT_EXPIRES_AT: ${BACKUP_EXPORT_EXPIRES_AT:-}
+      CARE_IMPORT_KEY: ${CARE_IMPORT_KEY:-}
+    expose:
+      - '3000'
+    volumes:
+      - khotwa-preview-state:/data/state
+    healthcheck:
+      test: ['CMD','node','scripts/healthcheck-vps.mjs']
+      interval: 30s
+      timeout: 8s
+      start_period: 150s
+      retries: 3
+volumes:
+  khotwa-preview-state:

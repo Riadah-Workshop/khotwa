@@ -1,0 +1,43 @@
+Khotwa optimized patch — 18 November 2026
+
+IMPORTANT: Create a backup of your running Docker volume and keep the last
+working Git commit before replacing code. Never delete /data/state.
+
+Replace or ADD each file listed below at EXACTLY the same relative path inside
+your existing khotwa-main GitHub repository. These are the only source paths
+changed in this release. Uploading the ZIP as one GitHub file is NOT deployment.
+
+.dockerignore
+.gitignore
+Dockerfile
+README-OPTIMIZED-COOLIFY.md
+app/api/compatibility/route.ts
+app/api/data/route.ts
+app/api/desk-close/route.ts
+app/api/evidence-file/route.ts
+app/api/messages/route.ts
+app/api/parents/route.ts
+app/api/platform-papers/route.ts
+app/api/reply-templates/route.ts
+app/api/school-work/route.ts
+app/api/siblings/route.ts
+app/api/student-care/import/route.ts
+app/api/student-care/route.ts
+app/api/student-evaluation/route.ts
+app/api/student-movements/route.ts
+app/api/visitors/route.ts
+app/dashboard.tsx
+app/messages-panel.tsx
+app/notification-counts.ts
+app/visitors-panel.tsx
+build/sites-worker.ts
+cloudflare-env.d.ts
+docker-compose.yml
+lib/request-origin.ts
+lib/standalone-auth.ts
+public/haramain-logo.png
+scripts/healthcheck-vps.mjs
+scripts/test-khotwa-auth.mjs
+scripts/test-origin-policy.mjs
+
+Use README-OPTIMIZED-COOLIFY.md for deployment and validation instructions.
