@@ -1,1 +1,0 @@
-ALTER TABLE `cases` ADD `extra` text DEFAULT '{}' NOT NULL;

@@ -1,1 +1,0 @@
-ALTER TABLE `school_trips` ADD `departure_time` text DEFAULT '' NOT NULL;
