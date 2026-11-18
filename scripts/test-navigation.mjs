@@ -1,0 +1,25 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import ts from 'typescript';
+const source=ts.createSourceFile('dashboard.tsx',fs.readFileSync('app/dashboard.tsx','utf8'),ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);
+const dashboard=source.statements.find(n=>ts.isFunctionDeclaration(n)&&n.name?.text==='Dashboard');
+const names=['canLeaveAttendance','go','newCase'];
+const functions=dashboard.body.statements.filter(n=>ts.isFunctionDeclaration(n)&&names.includes(n.name?.text)).map(n=>n.getText(source)).join('\n');
+const effect=dashboard.body.statements.find(n=>ts.isExpressionStatement(n)&&n.getText(source).includes("window.addEventListener('hashchange'"));
+const code=ts.transpile(functions+'\n'+effect.getText(source),{target:ts.ScriptTarget.ES2022});
+const harness=new Function('assert',`let busy=false,tab='attendance',profile=null,query='بحث',error='خطأ',caseForm={type:'التأخر الصباحي'},caseEditing=null,viewCase=null,attendanceDirty={current:true},allowed=false,prompts=0,listener;
+const INCIDENT_TYPE='الوقائع والإسعافات';const ui=text=>text;
+const TYPES=['التأخر الصباحي','الاستئذان','','','','التواصل مع ولي الأمر'],caseDraft={hasWork:false,clear:()=>{}},setClassLateGroup=()=>{},datetimeLocal=()=> '2026-10-15T08:30';
+const CLASS_LATE_TYPE='التأخر عن دخول الحصة',blankClassLate=()=>({type:CLASS_LATE_TYPE});
+const NAV=[['home'],['attendance'],['case']],location={hash:'#attendance'},history={replaceState:(a,b,hash)=>{location.hash=hash;}},window={addEventListener:(name,fn)=>listener=fn,removeEventListener:()=>{}},confirm=()=>{prompts++;return allowed;},useEffect=fn=>fn(),setDeskTarget=()=>{},setTab=x=>tab=x,setProfile=x=>profile=x,setQuery=x=>query=x,setError=x=>error=x,setCaseEditing=x=>caseEditing=x,setViewCase=x=>viewCase=x,setCaseForm=x=>caseForm=x,blankCase=()=>({studentId:''});
+${code}
+go('home');assert.equal(tab,'attendance');assert.equal(location.hash,'#attendance');assert.equal(attendanceDirty.current,true);
+newCase('student');assert.equal(caseForm.type,'التأخر الصباحي');
+location.hash='#home';listener();assert.equal(tab,'attendance');assert.equal(location.hash,'#attendance');
+allowed=true;go('home');assert.equal(tab,'home');assert.equal(location.hash,'home');assert.equal(attendanceDirty.current,false);assert.equal(query,'');
+const before=prompts;go('attendance');assert.equal(prompts,before);
+newCase('student');assert.equal(tab,'case');assert.equal(location.hash,'case');assert.equal(caseForm.studentId,'student');
+location.hash='#home';listener();assert.equal(tab,'home');
+busy=true;go('attendance');assert.equal(tab,'home');
+`);
+harness(assert);console.log('Navigation passed: cancel preserves attendance draft, approved exit, browser hash back, case route, busy guard and clean navigation without prompts.');

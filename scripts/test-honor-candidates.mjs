@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';import fs from 'node:fs';import ts from 'typescript';
+const exports={};new Function('exports',ts.transpileModule(fs.readFileSync('lib/honor-candidates.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(exports);
+const students=Array.from({length:13},(_,i)=>({id:'student-'+i,name:'طالب اختبار '+i,grade:'الرابع',classroom:'أ',active:i===12?0:1}));
+const types=['التأخر الصباحي','الاستئذان','المخالفات السلوكية','السلوك الإيجابي','الملاحظات','التواصل مع ولي الأمر','زيارة ولي الأمر'];
+const cases=types.map((type,i)=>({studentId:students[i].id,type,occurredAt:'2026-10-01T04:00:00Z'}));cases.push({studentId:'student-11',type:'المخالفات السلوكية',occurredAt:'2026-10-01T04:00:00Z',deletedAt:'2026-10-02T04:00:00Z'});
+const attendance=[{studentId:'student-7',status:'absent',date:'2026-10-01'},{studentId:'student-8',status:'late',date:'2026-10-01'},{studentId:'student-9',status:'present',date:'2026-10-01'},{studentId:'student-10',status:'unmarked',date:'2026-10-01'}];
+const before=JSON.stringify({students,cases,attendance}),rows=exports.honorCandidates(students,cases);
+assert.deepEqual(rows.map(s=>s.id),['student-3','student-4','student-6','student-7','student-8','student-9','student-10','student-11']);
+assert.equal(JSON.stringify({students,cases,attendance}),before,'read-only calculation');
+const summons={studentId:'student-6',type:'زيارة ولي الأمر',occurredAt:'2026-10-01T04:00:00Z',extra:JSON.stringify({visitReason:'استدعاء إدارة المدرسة'})};
+assert.equal(exports.honorCandidates(students,[...cases,summons]).some(s=>s.id==='student-6'),false);
+assert.equal(exports.blocksHonor({...summons,extra:JSON.stringify({visitReason:'استفسار عن مستوى الطالب'})}),false,'ordinary visits allowed');
+assert.equal(exports.blocksHonor({...summons,type:'استدعاء ولي الأمر'}),true);
+assert.equal(exports.honorCandidates(students,[]).length,12);assert.equal(exports.honorCandidates(students,[{studentId:'student-7',type:'التأخر الصباحي',occurredAt:'2026-09-01T04:00:00Z'}]).some(s=>s.id==='student-7'),false,'all case history counts');
+console.log('Honor criteria passed: absence and attendance ignored, positive/general notes/routine visits allowed, five specified case categories/summons excluded, historical cases, deleted cases and inactive students handled, no record changes.');
