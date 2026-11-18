@@ -1,6 +1,0 @@
-'use client';
-import {useLocale,UiText} from './locale';
-
-import {REGISTRATION_PRINT} from '../lib/registration';
-import {PROGRAM_OWNER_CREDIT} from '../lib/brand';
-export default function SchoolIdentity({school='مدرسة الحرمين الابتدائية بالخبر',compact=false,national=false}:{school?:string;compact?:boolean;national?:boolean}){const {ui,language}=useLocale();return <div className={'school-identity '+(compact?'compact':'')+(national?' with-national':'')}><img className="school-emblem" src="/haramain-logo.png" alt={ui("شعار المدرسة")}/><div><b>{school}</b>{!compact&&<small><UiText text={"خطوة • نظام إدارة أعمال الوكيل المدرسي"}/></small>}<small className="school-owner-credit">{PROGRAM_OWNER_CREDIT}</small><small className="school-registration-credit">{REGISTRATION_PRINT}</small></div><img className="ministry-emblem" src="/moe-logo.svg" alt={ui("شعار وزارة التعليم")}/>{national&&<span className="national-marks" role="group" aria-label={ui("شعار المملكة ورؤية السعودية ٢٠٣٠")}><img className="kingdom-emblem" src="/saudi-emblem.svg" alt={ui("شعار المملكة العربية السعودية — السيفان والنخلة")} width={44} height={48}/><img className="vision-emblem" src="/saudi-vision-2030.svg" alt={ui("شعار رؤية السعودية ٢٠٣٠")} width={84} height={56}/></span>}</div>;}
