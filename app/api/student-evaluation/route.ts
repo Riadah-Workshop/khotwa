@@ -1,3 +1,4 @@
+import {getTenantDb} from '../../../lib/school-tenancy';
 import {trustedBrowserOrigin} from '../../../lib/request-origin';
 import {env} from 'cloudflare:workers';
 import {getChatGPTUser,denyReadOnlyWrite} from '../../chatgpt-auth';
@@ -17,12 +18,12 @@ const empty={indicators:[],improvements:[],checklist:[],visitNotes:'',revision:0
 
 export async function GET(){
  if(!await getChatGPTUser())return json({error:'يرجى تسجيل الدخول'},401);
- try{const row=await env.DB!.prepare('SELECT value FROM settings WHERE id=?').bind(KEY).first<{value:string}>();if(!row)return json(empty);const value=record.parse(JSON.parse(row.value));return json(value);}catch{return json({error:'تعذر تحميل بيانات التقويم والتحسين.'},503);}
+ try{const row=await getTenantDb().prepare('SELECT value FROM settings WHERE id=?').bind(KEY).first<{value:string}>();if(!row)return json(empty);const value=record.parse(JSON.parse(row.value));return json(value);}catch{return json({error:'تعذر تحميل بيانات التقويم والتحسين.'},503);}
 }
 
 export async function POST(req:Request){
  const denied=await denyReadOnlyWrite();if(denied)return denied;
  if(!await getChatGPTUser())return json({error:'يرجى تسجيل الدخول'},401);
  if(!trustedBrowserOrigin(req,env.KHOTWA_PUBLIC_ORIGINS)||!req.headers.get('content-type')?.includes('application/json'))return json({error:'طلب غير مسموح'},403);
- try{const body=await req.text();if(body.length>1_000_000)return json({error:'حجم البيانات كبير'},413);const value=record.parse(JSON.parse(body));const next={...value,revision:value.revision+1};await env.DB!.prepare('INSERT INTO settings(id,value) VALUES(?,?) ON CONFLICT(id) DO UPDATE SET value=excluded.value').bind(KEY,JSON.stringify(next)).run();return json(next);}catch(e){return json({error:e instanceof z.ZodError?'راجع حقول التقويم والتحسين.':'تعذر حفظ البيانات، حدّث الصفحة ثم أعد المحاولة.'},400);}
+ try{const body=await req.text();if(body.length>1_000_000)return json({error:'حجم البيانات كبير'},413);const value=record.parse(JSON.parse(body));const next={...value,revision:value.revision+1};await getTenantDb().prepare('INSERT INTO settings(id,value) VALUES(?,?) ON CONFLICT(id) DO UPDATE SET value=excluded.value').bind(KEY,JSON.stringify(next)).run();return json(next);}catch(e){return json({error:e instanceof z.ZodError?'راجع حقول التقويم والتحسين.':'تعذر حفظ البيانات، حدّث الصفحة ثم أعد المحاولة.'},400);}
 }
