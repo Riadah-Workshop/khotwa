@@ -1,0 +1,25 @@
+Khotwa — Hostinger SMTP email invitations — 2026-11-19
+
+Base: khotwa-main-email-invitations-20261119.zip
+Full replacement: khotwa-hostinger-mail-full-20261119.zip (contains a khotwa-main/ wrapper)
+Changed only: khotwa-hostinger-mail-changed-files-20261119.zip (paths start at repository root)
+
+Hostinger is preferred when KHOTWA_SMTP_USER and KHOTWA_SMTP_PASSWORD are configured.
+Resend remains as an optional fallback. No new database migration or dependencies.
+Hostinger SMTP acceptance is NOT confirmation of delivery. Activation and first login are tracked.
+
+Before deploying, back up the /data/state volume and preserve admin security settings.
+Follow KHOTWA-HOSTINGER-MAIL-SETUP.md. Do not upload the archive wrapper as nested folder.
+
+New and changed paths (11):
+Dockerfile
+KHOTWA-EMAIL-INVITATIONS-ADMIN-LOGIN-20261119.md
+KHOTWA-HOSTINGER-MAIL-SETUP.md
+app/admin/admin-console.tsx
+cloudflare-env.d.ts
+docker-compose.yml
+lib/deputy-invites.ts
+lib/hostinger-smtp.ts
+scripts/launch-vps-preview.mjs
+scripts/test-deputy-invitations.mjs
+scripts/test-hostinger-smtp.mjs
