@@ -10,6 +10,9 @@ export type ChatGPTUser = {
   fullName: string | null;
 };
 
+const USER_ROLE_HEADER = "oai-authenticated-user-role";
+const USER_SCHOOL_HEADER = "oai-authenticated-user-school-id";
+const USER_PARENT_PHONE_HEADER = "oai-authenticated-user-parent-phone";
 const USER_ID_HEADER = "oai-authenticated-user-id";
 const USER_EMAIL_HEADER = "oai-authenticated-user-email";
 const USER_FULL_NAME_HEADER = "oai-authenticated-user-full-name";
@@ -91,9 +94,17 @@ function safeDecodeURIComponent(value: string): string | null {
   }
 }
 
+export async function getKhotwaAccess(): Promise<{role:'main_admin'|'deputy'|'parent';schoolId:string;parentPhone:string}|null> {
+ const h=await headers();
+ const role=h.get(USER_ROLE_HEADER),schoolId=h.get(USER_SCHOOL_HEADER);
+ if((role!=='main_admin'&&role!=='deputy'&&role!=='parent')||!schoolId)return null;
+ return {role,schoolId,parentPhone:h.get(USER_PARENT_PHONE_HEADER)||''};
+}
+
 // Call before reading a write payload or touching storage / upstream services.
 // Service callers without a visitor identity still use their existing secret checks.
 export async function denyReadOnlyWrite(): Promise<Response | null> {
   const user = await getChatGPTUser();
-  return readOnlyWriteResponse(user?.email);
+  const access=await getKhotwaAccess();
+  return access?.role==='deputy'||access?.role==='main_admin'?null:readOnlyWriteResponse(user?.email);
 }
