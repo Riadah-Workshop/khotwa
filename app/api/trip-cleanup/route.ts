@@ -1,10 +1,11 @@
+import {getTenantDb} from '../../../lib/school-tenancy';
 import {env} from 'cloudflare:workers';
 export const dynamic='force-dynamic';
 const json=(v:unknown,status=200)=>Response.json(v,{status,headers:{'Cache-Control':'private, no-store'}});
 // One-time maintenance: the owner configures one target and a short-lived secret.
 // No request can select another trip. Disabled when the secret is removed.
 export async function POST(req:Request){
- const e=env as unknown as {DB:D1Database;BUCKET:R2Bucket;TRIP_PURGE_KEY?:string;TRIP_PURGE_ID?:string;TRIP_PURGE_EXPIRES_AT?:string};
+ const e=({...env as unknown as {DB:D1Database;BUCKET:R2Bucket;TRIP_PURGE_KEY?:string;TRIP_PURGE_ID?:string;TRIP_PURGE_EXPIRES_AT?:string},DB:getTenantDb()});
  const expires=Date.parse(e.TRIP_PURGE_EXPIRES_AT||'');
  if(!e.TRIP_PURGE_KEY||!e.TRIP_PURGE_ID||!Number.isFinite(expires)||expires<Date.now()||expires>Date.now()+3600000||req.headers.get('authorization')!=='Bearer '+e.TRIP_PURGE_KEY)return json({error:'غير مسموح'},403);
  try{
