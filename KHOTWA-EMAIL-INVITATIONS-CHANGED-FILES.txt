@@ -1,0 +1,68 @@
+Khotwa — Nov 19, 2026 — School deputy email invitations + independent admin login
+
+Base archive: khotwa-main(3).zip
+Full source: khotwa-main-email-invitations-20261119.zip (contains khotwa-main/)
+Changed-only archive: khotwa-email-invitations-changed-files-20261119.zip (paths start at repository root)
+
+Do not upload the nested folder as an extra layer. In GitHub, replace the files by their exact paths.
+
+Features:
+- /admin-login: separate Main Admin credentials; /admin school console.
+- /login: school deputy only; /parent-login: parents unchanged.
+- 48h single-use email activation with password chosen by deputy.
+- Resend provider acceptance and signed webhook delivery status.
+- Password setup and first login recorded in administrator dashboard.
+- Self-service password reset by email; no generated password shown to admin.
+- Replaced old developer personal credit with Khotwa management team credit.
+- Existing schools, students, reports, dashboards and parent portal preserved.
+
+Read KHOTWA-EMAIL-INVITATIONS-ADMIN-LOGIN-20261119.md before deployment.
+Back up Coolify persistent /data/state volume before running migration 0022.
+A complete production build / real email delivery has not yet been tested here.
+
+Changed/new files (45):
+Dockerfile
+KHOTWA-EMAIL-INVITATIONS-ADMIN-LOGIN-20261119.md
+KHOTWA-MULTI-SCHOOL-DEPLOYMENT.md
+app/absence-student-report.tsx
+app/activity-report.tsx
+app/admin/admin-console.tsx
+app/admin/admin.css
+app/api/admin/route.ts
+app/api/webhooks/resend/route.ts
+app/attendance-panel.tsx
+app/batch-late.tsx
+app/care-report.tsx
+app/dashboard.tsx
+app/day-close-report.tsx
+app/harvest-panel.tsx
+app/honor-panel.tsx
+app/improvement-panel.tsx
+app/message-print-preview.tsx
+app/period-report-panel.tsx
+app/permit-print.tsx
+app/registration-badge.tsx
+app/repeated-cases-panel.tsx
+app/school-identity.tsx
+app/student-full-report.tsx
+app/visitors-panel.tsx
+cloudflare-env.d.ts
+docker-compose.yml
+drizzle/0022_deputy_email_activations.sql
+lib/brand.ts
+lib/deputy-invites.ts
+lib/message-pdf.ts
+lib/permit-pdf.ts
+lib/registrar-name.ts
+lib/repeated-notification.ts
+lib/reply-templates.ts
+lib/standalone-auth.ts
+lib/ui-translations.ts
+scripts/launch-vps-preview.mjs
+scripts/test-audit.mjs
+scripts/test-deputy-invitations.mjs
+scripts/test-khotwa-auth.mjs
+scripts/test-message-print.mjs
+scripts/test-messages-proxy.mjs
+scripts/test-multischool-auth.mjs
+scripts/test-permit-pdf.mjs
