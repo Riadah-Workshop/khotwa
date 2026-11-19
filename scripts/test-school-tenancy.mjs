@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import {rewriteSchoolSql,tableName,SCHOOL_TABLES} from '../lib/school-sql.ts';
+const sid='a3f9c19bb2ef';
+assert.equal(tableName(sid,'students'),'tenant_'+sid+'_students');
+assert.equal(rewriteSchoolSql('SELECT id FROM students WHERE name=\'students\'',sid),`SELECT id FROM tenant_${sid}_students WHERE name='students'`);
+assert.equal(rewriteSchoolSql('SELECT "students"."id" FROM "students" JOIN "cases" ON "cases"."student_id"="students"."id"',sid),`SELECT "tenant_${sid}_students"."id" FROM "tenant_${sid}_students" JOIN "tenant_${sid}_cases" ON "tenant_${sid}_cases"."student_id"="tenant_${sid}_students"."id"`);
+assert.equal(rewriteSchoolSql('CREATE TABLE `cases` (`student_id` text REFERENCES `students`(`id`))',sid),`CREATE TABLE \`tenant_${sid}_cases\` (\`student_id\` text REFERENCES \`tenant_${sid}_students\`(\`id\`))`);
+assert.equal(rewriteSchoolSql('SELECT * FROM students', 'default'),'SELECT * FROM students');
+assert.equal(rewriteSchoolSql("SELECT '-- students' AS label -- students\nFROM students",sid),`SELECT '-- students' AS label -- students\nFROM tenant_${sid}_students`);
+assert.throws(()=>tableName('../evil','students'));
+assert.throws(()=>tableName(sid,'khotwa_schools'));
+assert.equal(SCHOOL_TABLES.length,23);
+console.log('School tenancy SQL isolation tests passed');
