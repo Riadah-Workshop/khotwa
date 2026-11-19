@@ -1,5 +1,6 @@
+import {getTenantDb} from '../../../lib/school-tenancy';
 import {env} from 'cloudflare:workers';
-import {getChatGPTUser} from '../../chatgpt-auth';
+import {getKhotwaAccess,getChatGPTUser} from '../../chatgpt-auth';
 import {canAccessCare} from '../../../lib/care-access';
 export const dynamic='force-dynamic';
 const TABLES=['students','cases','contacts','followups','settings','attendance','attendance_rounds','attendance_audit','absence_followups','absence_events','case_revisions','student_families','school_trips','school_trip_students','school_tasks','school_evidence','desk_closures','student_movements'] as const;
@@ -12,8 +13,8 @@ export async function GET(req:Request){
  const user=await getChatGPTUser();if(!serviceAllowed&&!user)return Response.json({error:'يرجى تسجيل الدخول'},{status:401});
  try{
   // D1 batch provides one transactional read of all tables, including complete audit summaries.
-  const tables:string[]=[...TABLES,...(canAccessCare(user?.email)?['student_care','care_intake']:[])],keys=[...KEYS,...(canAccessCare(user?.email)?['studentCare','careIntake']:[])];
-  const result=await env.DB!.batch(tables.map(table=>env.DB!.prepare(`SELECT * FROM ${table}`)));
+  const tables:string[]=[...TABLES,...((canAccessCare(user?.email)||['main_admin','deputy'].includes((await getKhotwaAccess())?.role||''))?['student_care','care_intake']:[])],keys=[...KEYS,...((canAccessCare(user?.email)||['main_admin','deputy'].includes((await getKhotwaAccess())?.role||''))?['studentCare','careIntake']:[])];
+  const result=await getTenantDb().batch(tables.map(table=>getTenantDb().prepare(`SELECT * FROM ${table}`)));
   const data:Record<string,unknown>={format:'shuoon-independent-v1',exportedAt:new Date().toISOString()};
   for(let i=0;i<tables.length;i++){
    const rows=result[i].results as Record<string,unknown>[];
