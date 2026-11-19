@@ -1,5 +1,6 @@
 import handler from "vinext/server/fetch-handler";
 import { handleKhotwaAuthentication } from "../lib/standalone-auth";
+import {runWithSchool} from "../lib/school-tenancy";
 import { runWithConnectorBinding } from "../lib/connector-context";
 import type { ConnectorBinding } from "../lib/connector-contract.mjs";
 
@@ -11,7 +12,7 @@ export default {
       if (request.method !== 'GET') return new Response('Method Not Allowed', {status: 405});
       try {
         if (!env.DB) throw new Error('Missing D1 binding');
-        await env.DB.prepare('SELECT 1 FROM settings LIMIT 1').all();
+        await env.DB.batch([env.DB.prepare('SELECT 1 FROM settings LIMIT 1'),env.DB.prepare('SELECT 1 FROM khotwa_schools LIMIT 1')]);
         return Response.json({service: 'khotwa', status: 'ready'}, {headers: {'Cache-Control': 'no-store'}});
       } catch {
         return Response.json({service: 'khotwa', status: 'not-ready'}, {status: 503, headers: {'Cache-Control': 'no-store'}});
@@ -39,6 +40,8 @@ export default {
         },
       };
     }
-    return runWithConnectorBinding(binding, () => handler.fetch(request, env, ctx));
+    return result.school
+      ? runWithSchool(result.school, () => runWithConnectorBinding(binding, () => handler.fetch(request, env, ctx)))
+      : runWithConnectorBinding(binding, () => handler.fetch(request, env, ctx));
   },
 };
