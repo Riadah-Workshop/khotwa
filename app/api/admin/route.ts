@@ -6,6 +6,7 @@ import {issueDeputyInvite} from '../../../lib/deputy-invites';
 import {adminSwitchCookie} from '../../../lib/standalone-auth';
 import {tableName,provisionSchool,SCHOOL_TABLES} from '../../../lib/school-tenancy';
 import {parentPhone} from '../../../lib/parent-view';
+import {validSaudiLocation} from '../../../lib/saudi-locations';
 export const dynamic='force-dynamic';
 const json=(v:unknown,status=200)=>Response.json(v,{status,headers:{'Cache-Control':'private, no-store'}});
 const id=z.string().regex(/^(?:default|[a-f0-9]{12})$/);
@@ -26,7 +27,7 @@ export async function GET(){
  try{
   const db=env.DB!;
   const [schools,accounts]=await Promise.all([
-   db.prepare('SELECT id,code,name,active,created_at FROM khotwa_schools ORDER BY created_at').all<any>(),
+   db.prepare('SELECT id,code,name,region,city,active,created_at FROM khotwa_schools ORDER BY created_at').all<any>(),
    db.prepare("SELECT a.id,a.school_id,a.email,a.full_name,CASE WHEN EXISTS(SELECT 1 FROM khotwa_manager_accounts m WHERE m.account_id=a.id) THEN 'manager' ELSE 'deputy' END AS role,a.active,a.created_at,a.activated_at,a.password_set_at,a.first_login_at,a.invited_at,a.invitation_status,a.invitation_error_code,a.email_accepted_at,a.email_delivered_at,(SELECT i.expires_at FROM khotwa_deputy_invites i WHERE i.account_id=a.id ORDER BY i.created_at DESC LIMIT 1) AS invitation_expires_at FROM khotwa_accounts a ORDER BY a.created_at DESC").all<any>()]);
   const data=[];
   for(const school of schools.results){
@@ -44,19 +45,21 @@ export async function POST(req:Request){
   const body=z.object({op:z.string(),data:z.unknown()}).parse(JSON.parse(raw));
   const db=env.DB!,now=new Date().toISOString(),data=body.data;
   if(body.op==='create-school'){
-   const v=z.object({name:schoolName,code:schoolCode}).parse(data);
+   const v=z.object({name:schoolName,code:schoolCode,region:z.string(),city:z.string()}).parse(data);
+   if(!validSaudiLocation(v.region,v.city))return json({error:'اختر منطقة ومدينة سعوديتين صحيحتين'},400);
    if(await db.prepare('SELECT id FROM khotwa_schools WHERE code=?').bind(v.code).first())return json({error:'رمز المدرسة مستخدم'},409);
    const schoolId=crypto.randomUUID().replace(/-/g,'').slice(0,12);
    await provisionSchool(db,schoolId);
-   await db.prepare('INSERT INTO khotwa_schools(id,code,name,active,created_at) VALUES(?,?,?,1,?)').bind(schoolId,v.code,v.name,now).run();
+   await db.prepare('INSERT INTO khotwa_schools(id,code,name,region,city,active,created_at) VALUES(?,?,?,?,?,1,?)').bind(schoolId,v.code,v.name,v.region,v.city,now).run();
    // Each school has its own settings, even before the deputy logs in.
    await db.prepare(`INSERT INTO "${tableName(schoolId,'settings')}"(id,value) VALUES('school',?)`).bind(v.name).run();
    return json({ok:true,schoolId});
   }
   if(body.op==='edit-school'){
-   const v=z.object({id,name:schoolName,code:schoolCode,active:z.boolean()}).parse(data);
+   const v=z.object({id,name:schoolName,code:schoolCode,active:z.boolean(),region:z.string(),city:z.string()}).parse(data);
+   if(!validSaudiLocation(v.region,v.city))return json({error:'اختر منطقة ومدينة سعوديتين صحيحتين'},400);
    if(v.id==='default'&&!v.active)return json({error:'لا يمكن إيقاف المدرسة الأساسية'},400);
-   const result=await db.prepare('UPDATE khotwa_schools SET name=?,code=?,active=? WHERE id=?').bind(v.name,v.code,v.active?1:0,v.id).run();
+   const result=await db.prepare('UPDATE khotwa_schools SET name=?,code=?,region=?,city=?,active=? WHERE id=?').bind(v.name,v.code,v.region,v.city,v.active?1:0,v.id).run();
    if(!result.meta.changes)return json({error:'المدرسة غير موجودة'},404);
    await db.prepare(`INSERT INTO "${tableName(v.id,'settings')}"(id,value) VALUES('school',?) ON CONFLICT(id) DO UPDATE SET value=excluded.value`).bind(v.name).run();
    return json({ok:true});
@@ -69,6 +72,7 @@ export async function POST(req:Request){
    if(v.email===(env.KHOTWA_ADMIN_EMAIL||'').toLowerCase())return json({error:'هذا البريد مخصص لمدير النظام'},409);
    const accountId=crypto.randomUUID();
    await db.batch([db.prepare("INSERT INTO khotwa_accounts(id,school_id,email,full_name,role,password_hash,active,session_version,created_at,invitation_status) VALUES(?,?,?,?,'deputy','!pending-invitation!',1,1,?,'queued')").bind(accountId,v.schoolId,v.email,v.fullName,now),...(body.op==='create-manager'?[db.prepare('INSERT INTO khotwa_manager_accounts(account_id) VALUES(?)').bind(accountId)]:[])]);
+   await db.prepare(`INSERT INTO "${tableName(v.schoolId,'settings')}"(id,value) VALUES(?,?) ON CONFLICT(id) DO UPDATE SET value=excluded.value`).bind(body.op==='create-manager'?'principal':'deputy',v.fullName).run();
    const delivery=await issueDeputyInvite(db,env,{id:accountId,email:v.email,full_name:v.fullName,school_name:school.name},undefined,body.op==='create-manager'?'manager':'deputy');
    return json({ok:true,invitationStatus:delivery.status,invitationErrorCode:delivery.errorCode||null});
   }
@@ -76,7 +80,18 @@ export async function POST(req:Request){
    const v=z.object({id:z.string().uuid(),schoolId:id,fullName:z.string().trim().min(3).max(150),active:z.boolean()}).parse(data);
    if(!await db.prepare('SELECT id FROM khotwa_schools WHERE id=?').bind(v.schoolId).first())return json({error:'المدرسة غير موجودة'},400);
    if(v.schoolId==='default')return json({error:'اختر مدرسة فعلية'},400);
+   const previous=await db.prepare('SELECT full_name,school_id FROM khotwa_accounts WHERE id=?').bind(v.id).first<{full_name:string;school_id:string}>();
+   const role=await db.prepare('SELECT EXISTS(SELECT 1 FROM khotwa_manager_accounts m WHERE m.account_id=?) AS is_manager').bind(v.id).first<{is_manager:number}>();
+   const key=role?.is_manager?'principal':'deputy';
    const result=await db.prepare('UPDATE khotwa_accounts SET school_id=?,full_name=?,active=?,session_version=session_version+1 WHERE id=?').bind(v.schoolId,v.fullName,v.active?1:0,v.id).run();
+   if(result.meta.changes){
+    // The old school's reports must not retain a moved user's name.
+    if(previous?.school_id!==v.schoolId&&previous?.school_id){
+     await db.prepare(`DELETE FROM "${tableName(previous.school_id,'settings')}" WHERE id=? AND value=?`).bind(key,previous.full_name).run();
+    }
+    if(v.active)await db.prepare(`INSERT INTO "${tableName(v.schoolId,'settings')}"(id,value) VALUES(?,?) ON CONFLICT(id) DO UPDATE SET value=excluded.value`).bind(key,v.fullName).run();
+    else await db.prepare(`DELETE FROM "${tableName(v.schoolId,'settings')}" WHERE id=? AND value IN (?,?)`).bind(key,v.fullName,previous?.full_name||'').run();
+   }
    return result.meta.changes?json({ok:true}):json({error:'المستخدم غير موجود'},404);
   }
   if(body.op==='resend-deputy'||body.op==='reset-deputy'||body.op==='resend-account'){
@@ -90,15 +105,18 @@ export async function POST(req:Request){
   }
   if(body.op==='delete-account'){
    const v=z.object({id:z.string().uuid(),confirmEmail:email}).parse(data);
-   const row=await db.prepare('SELECT email FROM khotwa_accounts WHERE id=?').bind(v.id).first<{email:string}>();
+   const row=await db.prepare('SELECT email,full_name,school_id FROM khotwa_accounts WHERE id=?').bind(v.id).first<{email:string;full_name:string;school_id:string}>();
    if(!row)return json({error:'الحساب غير موجود'},404);
    if(row.email!==v.confirmEmail)return json({error:'يجب تأكيد البريد الإلكتروني المطابق للحساب'},400);
+   const role=await db.prepare('SELECT 1 AS is_manager FROM khotwa_manager_accounts WHERE account_id=?').bind(v.id).first();
    const completeAudit=await deletionAudit(db,'delete-account','global',v.id);
    await db.batch([
     db.prepare('DELETE FROM khotwa_deputy_invites WHERE account_id=?').bind(v.id),
+    db.prepare('DELETE FROM khotwa_account_email_changes WHERE account_id=?').bind(v.id),
     db.prepare('DELETE FROM khotwa_manager_accounts WHERE account_id=?').bind(v.id),
     db.prepare('DELETE FROM khotwa_accounts WHERE id=?').bind(v.id)
    ]);
+   await db.prepare(`DELETE FROM "${tableName(row.school_id,'settings')}" WHERE id=? AND value=?`).bind(role?'principal':'deputy',row.full_name).run();
    await completeAudit();
    return json({ok:true});
   }
@@ -109,8 +127,11 @@ export async function POST(req:Request){
    const completeAudit=await deletionAudit(db,'delete-parent',v.schoolId,phone);
    await db.batch([
     db.prepare('DELETE FROM khotwa_parent_users WHERE school_id=? AND phone=?').bind(v.schoolId,phone),
-    db.prepare(`DELETE FROM "${tableName(v.schoolId,'parent_grants')}" WHERE phone=?`).bind(phone)
+    db.prepare(`DELETE FROM "${tableName(v.schoolId,'parent_grants')}" WHERE phone=?`).bind(phone),
+    db.prepare('DELETE FROM khotwa_parent_memberships WHERE phone=? AND school_id=?').bind(phone,v.schoolId)
    ]);
+   const linked=await db.prepare('SELECT 1 AS found FROM khotwa_parent_memberships WHERE phone=? LIMIT 1').bind(phone).first();
+   if(!linked)await db.prepare('DELETE FROM khotwa_parent_identities WHERE phone=?').bind(phone).run();
    await completeAudit();
    return json({ok:true});
   }
@@ -140,8 +161,8 @@ export async function POST(req:Request){
    // D1 DROP TABLE automatically removes the table's indexes; children first.
    for(const name of [...order].reverse())await db.prepare(`DROP TABLE IF EXISTS "${tableName(v.schoolId,name)}"`).run();
    const accounts=(await db.prepare('SELECT id FROM khotwa_accounts WHERE school_id=?').bind(v.schoolId).all<{id:string}>()).results;
-   for(const account of accounts){await db.prepare('DELETE FROM khotwa_deputy_invites WHERE account_id=?').bind(account.id).run();await db.prepare('DELETE FROM khotwa_manager_accounts WHERE account_id=?').bind(account.id).run();}
-   await db.batch([db.prepare('DELETE FROM khotwa_accounts WHERE school_id=?').bind(v.schoolId),db.prepare('DELETE FROM khotwa_parent_users WHERE school_id=?').bind(v.schoolId),db.prepare('DELETE FROM khotwa_schools WHERE id=?').bind(v.schoolId)]);
+   for(const account of accounts){await db.prepare('DELETE FROM khotwa_deputy_invites WHERE account_id=?').bind(account.id).run();await db.prepare('DELETE FROM khotwa_account_email_changes WHERE account_id=?').bind(account.id).run();await db.prepare('DELETE FROM khotwa_manager_accounts WHERE account_id=?').bind(account.id).run();}
+   await db.batch([db.prepare('DELETE FROM khotwa_parent_memberships WHERE school_id=?').bind(v.schoolId),db.prepare('DELETE FROM khotwa_accounts WHERE school_id=?').bind(v.schoolId),db.prepare('DELETE FROM khotwa_parent_users WHERE school_id=?').bind(v.schoolId),db.prepare('DELETE FROM khotwa_schools WHERE id=?').bind(v.schoolId)]);
    await completeAudit();
    const access=await getKhotwaAccess();
    if(access?.schoolId===v.schoolId){const user=await getChatGPTUser(),response=json({ok:true});if(user)response.headers.set('Set-Cookie',await adminSwitchCookie(env.KHOTWA_SESSION_SECRET!,user.email,'default'));return response;}
