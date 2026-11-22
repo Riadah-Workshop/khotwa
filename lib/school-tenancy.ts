@@ -11,7 +11,7 @@ import {env} from 'cloudflare:workers';
 
 import {LEGACY_SCHOOL_ID,tenantPrefix,tableName,rewriteSchoolSql,SCHOOL_TABLES} from './school-sql';
 export {LEGACY_SCHOOL_ID,tenantPrefix,tableName,rewriteSchoolSql,SCHOOL_TABLES} from './school-sql';
-export type SchoolRole='main_admin'|'deputy'|'parent';
+export type SchoolRole='main_admin'|'deputy'|'manager'|'parent';
 export type SchoolContext={schoolId:string;role:SchoolRole;identity:string};
 const context=new AsyncLocalStorage<SchoolContext>();
 export function runWithSchool<T>(school:SchoolContext,fn:()=>T):T {
