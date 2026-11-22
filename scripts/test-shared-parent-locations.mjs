@@ -1,0 +1,31 @@
+import assert from 'node:assert/strict';
+import {readFileSync,readdirSync} from 'node:fs';
+import {DatabaseSync} from 'node:sqlite';
+import {parentLinkedSchools} from '../lib/parent-identities.ts';
+import {SAUDI_REGIONS,validSaudiLocation,saudiCity} from '../lib/saudi-locations.ts';
+assert.equal(SAUDI_REGIONS.length,13);
+assert.equal(validSaudiLocation('eastern','al-khobar'),true);
+assert.equal(saudiCity('eastern','al-khobar')?.ar,'الخبر');
+assert.equal(validSaudiLocation('eastern','riyadh'),false);
+assert.equal(validSaudiLocation('not-saudi','some-city'),false);
+const sql=new DatabaseSync(':memory:');
+for(const file of readdirSync('drizzle').filter(x=>/^\d{4}_.+\.sql$/.test(x)&&x<'0026_').sort())sql.exec(readFileSync('drizzle/'+file,'utf8'));
+const school1='a123456789ab',school2='b123456789ab',phone='0501234567';
+for(const [id,code,name] of [[school1,'SCH-1','School 1'],[school2,'SCH-2','School 2']]){
+ sql.prepare('INSERT INTO khotwa_schools(id,code,name,active,created_at) VALUES(?,?,?,1,?)').run(id,code,name,'2026-11-01T00:00:00Z');
+ sql.exec(`CREATE TABLE "tenant_${id}_parent_grants"(phone TEXT PRIMARY KEY,student_ids TEXT NOT NULL,enabled INTEGER NOT NULL,updated_at TEXT NOT NULL,actor TEXT NOT NULL)`);
+ sql.prepare(`INSERT INTO "tenant_${id}_parent_grants" VALUES(?,?,1,?,?)`).run(phone,'["a-student"]','2026-11-20T00:00:00Z','agent');
+}
+sql.prepare('INSERT INTO khotwa_parent_users(id,school_id,phone,password_hash,active,session_version,created_at) VALUES(?,?,?,?,1,1,?)').run('user1',school1,phone,'first-password-hash','2026-11-18T00:00:00Z');
+sql.prepare('INSERT INTO khotwa_parent_users(id,school_id,phone,password_hash,active,session_version,created_at) VALUES(?,?,?,?,1,1,?)').run('user2',school2,phone,'second-password-hash','2026-11-19T00:00:00Z');
+sql.exec(readFileSync('drizzle/0026_parent_identity_and_school_location.sql','utf8'));
+assert.equal(sql.prepare('SELECT COUNT(*) AS total FROM khotwa_parent_identities WHERE phone=?').get(phone).total,1);
+assert.equal(sql.prepare('SELECT password_hash FROM khotwa_parent_identities WHERE phone=?').get(phone).password_hash,'first-password-hash');
+assert.equal(sql.prepare('SELECT COUNT(*) AS total FROM khotwa_parent_memberships WHERE phone=?').get(phone).total,2);
+const db={prepare:(q)=>({bind:(...args)=>({all:async()=>({results:sql.prepare(q).all(...args)}),first:async()=>sql.prepare(q).get(...args)||null})})};
+assert.deepEqual((await parentLinkedSchools(db,phone)).map(s=>s.id).sort(),[school1,school2].sort());
+sql.prepare(`UPDATE "tenant_${school2}_parent_grants" SET enabled=0 WHERE phone=?`).run(phone);
+assert.deepEqual((await parentLinkedSchools(db,phone)).map(s=>s.id),[school1]);
+sql.prepare('UPDATE khotwa_parent_memberships SET enabled=0 WHERE phone=? AND school_id=?').run(phone,school1);
+assert.equal((await parentLinkedSchools(db,phone)).length,0);
+console.log('Shared parent/location tests passed: 13 Saudi regions, Eastern/Khobar, invalid city rejection, deduplicated legacy phone/password, two-school grants, disabled-school isolation.');
