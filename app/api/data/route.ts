@@ -4,7 +4,7 @@ import {withLateMinutes} from '../../../lib/late-minutes';
 import {movementBackup} from '../../../lib/student-movements';
 import {studentMovements} from '../../../db/schema';
 import {absenceQualificationSql} from '../../../lib/repeated-absence';
-import {denyReadOnlyWrite} from '../../chatgpt-auth';
+import {denyReadOnlyWrite,getKhotwaAccess} from '../../chatgpt-auth';
 import {savedReplyTemplates,REPLY_PREFIX} from '../../../lib/reply-templates';
 import {syncTodayRosters} from '../../../lib/attendance-roster-sync';
 import {registrarName,registrarDisplay} from '../../../lib/registrar-name';
@@ -29,7 +29,7 @@ export async function POST(req:Request){const denied=await denyReadOnlyWrite();i
  const user=await getChatGPTUser();if(!user)return json({error:'يرجى تسجيل الدخول'},401);
  const origin=req.headers.get('origin');if(!trustedBrowserOrigin(req,env.KHOTWA_PUBLIC_ORIGINS,true))return json({error:'طلب غير مسموح'},403);
  if(!req.headers.get('content-type')?.includes('application/json'))return json({error:'صيغة غير صحيحة'},400);
- const body=z.object({op:z.string(),data:z.unknown()}).parse(await req.json());operation=body.op;const db=getDb();const now=new Date().toISOString();const actor=registrarName(user.displayName,user.email);
+ const body=z.object({op:z.string(),data:z.unknown()}).parse(await req.json());operation=body.op;if(body.op==='case-delete'&&(await getKhotwaAccess())?.role!=='main_admin')return json({error:'الحذف متاح لمدير النظام فقط'},403);const db=getDb();const now=new Date().toISOString();const actor=registrarName(user.displayName,user.email);
  if(body.op==='attendance-roster-sync'){const date=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Riyadh',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());try{return json(await syncTodayRosters(getTenantDb(),date,actor,user.userId));}catch{return json({error:'تغيرت قوائم الحصر أثناء التحديث. حدّث البيانات وأعد المحاولة.'},409);}}
  else if(body.op==='student'){const v=studentSchema.parse(body.data);if(v.id){const existing=await db.select().from(students).where(eq(students.id,v.id));if(!existing.length)return json({error:'الطالب غير موجود'},404);await db.update(students).set({...v,updatedAt:now}).where(eq(students.id,v.id));}else{await db.insert(students).values({...v,id:crypto.randomUUID(),createdAt:now,updatedAt:now});}}
  else if(body.op==='archive'){const v=z.object({id,active:z.boolean()}).parse(body.data);await db.update(students).set({active:v.active?1:0,updatedAt:now}).where(eq(students.id,v.id));}
