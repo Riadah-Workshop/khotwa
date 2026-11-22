@@ -1,6 +1,6 @@
 import {getTenantDb} from '../../../lib/school-tenancy';
 import {trustedBrowserOrigin} from '../../../lib/request-origin';
-import {denyReadOnlyWrite} from '../../chatgpt-auth';
+import {denyReadOnlyWrite,getKhotwaAccess} from '../../chatgpt-auth';
 import {env} from 'cloudflare:workers';
 import {z} from 'zod';
 import {getChatGPTUser} from '../../chatgpt-auth';
@@ -15,6 +15,7 @@ export async function POST(req:Request){const denied=await denyReadOnlyWrite();i
  const text=await req.text();if(text.length>12000)return json({error:'الطلب كبير'},413);
  const body=z.discriminatedUnion('op',[z.object({op:z.literal('add'),id:z.string().uuid(),title:replyTemplateSchema.shape.title,body:replyTemplateSchema.shape.body}).strict(),z.object({op:z.literal('remove'),id:z.string().uuid()}).strict()]).parse(JSON.parse(text));
  const id=REPLY_PREFIX+body.id;
+ if(body.op==='remove'&&(await getKhotwaAccess())?.role!=='main_admin')return json({error:'الحذف متاح لمدير النظام فقط'},403);
  if(body.op==='remove')await getTenantDb().prepare('DELETE FROM settings WHERE id=?').bind(id).run();
  else{const value=JSON.stringify(replyTemplateSchema.parse({id:body.id,title:body.title,body:body.body,createdAt:new Date().toISOString()}));
  await getTenantDb().prepare('INSERT INTO settings (id,value) SELECT ?,? WHERE (SELECT COUNT(*) FROM settings WHERE substr(id,1,?)=?)<50 ON CONFLICT(id) DO NOTHING').bind(id,value,REPLY_PREFIX.length,REPLY_PREFIX).run();
