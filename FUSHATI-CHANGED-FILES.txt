@@ -1,0 +1,22 @@
+Khotwa × Fushati: changed/new paths relative to khotwa-main(7).zip
+
+FUSHATI-RELEASE-20261123.md
+app/admin/admin-console.tsx
+app/api/admin/route.ts
+app/api/fushati/receipts/route.ts
+app/api/fushati/route.ts
+app/chatgpt-auth.ts
+app/fushati/admin/page.tsx
+app/fushati/agent/page.tsx
+app/fushati/fushati-dashboard.tsx
+app/fushati/fushati.css
+app/manager/school-manager-dashboard.tsx
+app/parent/fushati-parent.css
+app/parent/fushati-parent.tsx
+app/parent/parent-portal.tsx
+drizzle/0027_fushati_cafeteria.sql
+lib/fushati/core.ts
+lib/school-tenancy.ts
+lib/standalone-auth.ts
+scripts/test-fushati-auth.mjs
+scripts/test-fushati-ledger.py
