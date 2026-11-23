@@ -137,6 +137,10 @@ export async function POST(req:Request){
   }
   if(body.op==='delete-school'){
    const v=z.object({schoolId:z.string().regex(/^[a-f0-9]{12}$/),confirmCode:schoolCode}).parse(data);
+   // Financial audit history is not part of the per-school table clone.
+   // Block deletion *before* disabling the school or dropping tenant tables.
+   if(await db.prepare('SELECT 1 FROM fushati_cafeterias WHERE school_id=? LIMIT 1').bind(v.schoolId).first())
+    return json({error:'المدرسة مرتبطة بمقصف فسحتي. لا يمكن حذف بيانات الطلاب مع وجود سجلات/حسابات مالية. أرشف المقصف وتواصل مع مسؤول البيانات قبل حذف المدرسة.'},409);
    const school=await db.prepare('SELECT code FROM khotwa_schools WHERE id=?').bind(v.schoolId).first<{code:string}>();
    if(!school)return json({error:'المدرسة غير موجودة'},404);
    if(school.code!==v.confirmCode)return json({error:'تأكيد رمز المدرسة غير مطابق'},400);
@@ -171,6 +175,8 @@ export async function POST(req:Request){
   if(body.op==='delete-record'){
    const v=z.object({schoolId:id,table:z.string(),key:z.string().min(1).max(200)}).parse(data);
    if(!SCHOOL_TABLES.includes(v.table))return json({error:'فئة سجلات غير مسموح بها'},400);
+   if(v.table==='students'&&await db.prepare('SELECT 1 FROM fushati_accounts WHERE school_id=? AND student_id=? LIMIT 1').bind(v.schoolId,v.key).first())
+    return json({error:'هذا الطالب مرتبط بحساب فسحتي. لا يمكن حذف سجل الطالب دون تسوية وحفظ السجل المالي أولاً.'},409);
    const table=tableName(v.schoolId,v.table);
    const cols=(await db.prepare(`PRAGMA table_info("${table}")`).all<{name:string;pk:number}>()).results;
    const pks=cols.filter(c=>c.pk>0);
