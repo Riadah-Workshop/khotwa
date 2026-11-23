@@ -1,0 +1,23 @@
+Modified/additional files relative to the Khotwa source root (basis khotwa-main(9).zip):
+
+KHOTWA-FUSHATI-ENHANCEMENTS-20261123.md
+app/admin/admin-console.tsx
+app/api/admin/route.ts
+app/api/fushati/route.ts
+app/fushati/fushati-dashboard.tsx
+app/parent/fushati-parent.css
+app/parent/fushati-parent.tsx
+app/parent/parent-portal.tsx
+drizzle/0028_khotwa_fushati_enhancements.sql
+lib/admin-credentials.ts
+lib/fushati/categories.ts
+lib/fushati/core.ts
+lib/fushati/identifiers.ts
+lib/fushati/invitations.ts
+lib/school-stages.ts
+lib/standalone-auth.ts
+scripts/test-deputy-invitations.mjs
+scripts/test-fushati-auth.mjs
+scripts/test-fushati-enhancements.py
+
+All other source files are unchanged. Do not remove your persistent /data/state database.
