@@ -79,7 +79,8 @@ export function monthsBetween(from: string, to: string): string[] {
  */
 export function trendColumns(points: TrendPoint[], range?: {from: string; to: string}): ColumnRow[] {
   const byMonth = new Map(points.map(point => [point.month, point.value]));
-  const months = [...new Set([...(range ? monthsBetween(range.from, range.to) : []), ...points.map(point => point.month)])].sort();
+  // Array.from, not a spread: the test loader compiles to ES5, where spreading a Set gives an empty list.
+  const months = Array.from(new Set((range ? monthsBetween(range.from, range.to) : []).concat(points.map(point => point.month)))).sort();
   const max = months.reduce((top, month) => Math.max(top, byMonth.get(month) || 0), 0);
   return months.map(month => {
     const value = byMonth.get(month) || 0;
