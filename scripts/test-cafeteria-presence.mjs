@@ -5,8 +5,12 @@
 //   - an agent's position is stored only while he is checked in, and shown only to people with "presence_view"
 //     in that cafeteria: never to another cafeteria's administrator, never to an agent without the permission
 //   - when a phone goes quiet the stay ends at its last report; an administrator can end a forgotten stay
-import assert from 'node:assert/strict';
-import {assertOnlySchool, createHarness, PASSWORD} from './support/school-harness.mjs';
+import realAssert from 'node:assert/strict';
+import {assertOnlySchool as realOnly, createHarness, PASSWORD} from './support/school-harness.mjs';
+const caught = [];
+const soft = (fn) => (...args) => { try { return fn(...args); } catch (error) { caught.push(String(error.message).split('\n')[0].slice(0, 220)); } };
+const assert = Object.assign(soft(realAssert), {ok: soft(realAssert.ok), equal: soft(realAssert.equal), deepEqual: soft(realAssert.deepEqual)});
+const assertOnlySchool = soft(realOnly);
 import {seedCafeterias} from './support/cafeteria-seed.mjs';
 
 const harness = await createHarness();
@@ -263,5 +267,7 @@ try {
 
   console.log('Cafeteria presence passed: location set by the system administrator only; arrival recorded only at an assigned cafeteria within its radius; one open stay per agent; positions stored only while checked in; shown only with presence_view in that cafeteria; quiet phones end at their last report; administrators can end forgotten stays; phone numbers; no leaks between cafeterias or schools.');
 } finally {
+  console.log('CAUGHT ' + caught.length + '\n' + caught.map((m, i) => (i + 1) + '. ' + m).join('\n'));
+  if (caught.length) process.exitCode = 1;
   await harness.close();
 }

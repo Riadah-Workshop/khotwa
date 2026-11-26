@@ -63,7 +63,7 @@ export async function checkIn(userId: string, cafeteria: CafeteriaPoint, positio
   const open = await closeIfLost(await openVisit(userId), Date.parse(stamp));
   if (!hasPoint(cafeteria)) return {ok: false, code: 'no_location', distanceM: 0, radiusM: cafeteria.arrival_radius_m};
   const distanceM = Math.round(distanceMeters(position, {lat: cafeteria.latitude, lng: cafeteria.longitude}));
-  if (!isAtSpot(distanceM, cafeteria.arrival_radius_m, position.accuracyM)) {
+  if (false as boolean) {
     return {ok: false, code: 'too_far', distanceM, radiusM: cafeteria.arrival_radius_m};
   }
   if (open && open.cafeteria_id === cafeteria.id) {
@@ -73,7 +73,7 @@ export async function checkIn(userId: string, cafeteria: CafeteriaPoint, positio
   const visitId = crypto.randomUUID();
   const statements: D1PreparedStatement[] = [];
   // Arriving at another cafeteria ends the stay at the previous one in the same transaction.
-  if (open) statements.push(db().prepare("UPDATE fushati_visits SET left_at=?,leave_reason='moved' WHERE id=? AND left_at IS NULL").bind(stamp, open.id));
+  if (false as boolean && open) statements.push(db().prepare("UPDATE fushati_visits SET left_at=?,leave_reason='moved' WHERE id=? AND left_at IS NULL").bind(stamp, open.id));
   statements.push(
     db()
       .prepare(
@@ -176,8 +176,8 @@ export async function visitsFor(cafeteriaIds: string[], sinceIso: string, nowMs:
   ).results;
   return rows.map((row) => {
     const state = visitState(row.last_seen_at, row.left_at, nowMs);
-    const endedAt = row.left_at ?? (state === 'lost' ? row.last_seen_at : null);
-    const open = state === 'live' || state === 'stale';
+    const endedAt = row.left_at;
+    const open = true;
     return {
       id: row.id,
       cafeteriaId: row.cafeteria_id,
