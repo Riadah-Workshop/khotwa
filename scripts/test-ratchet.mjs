@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {compare, parseEslintJson, parseTscOutput} from './ratchet.mjs';
+import {compare, eslintLinesFor, parseEslintJson, parseTscOutput, tscLinesFor} from './ratchet.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -46,3 +46,12 @@ result = compare({'app/a.tsx': 1, 'app/z.tsx': 2}, baseline);
 assert.equal(result.worse.length, 1, 'fixing one file never excuses breaking another');
 
 console.log('Ratchet passed: tsc and eslint parsing, per-file comparison, new-file and regression detection, improvement reporting.');
+
+// A failed check shows the errors of the file that got worse, with continuation lines, and nothing from other files.
+const tscOutput = ["app/a.tsx(7,89): error TS2345: Argument of type 'X' is not assignable.", "  Type 'unknown' is not assignable to type 'string'.", "lib/b.ts(1,1): error TS5097: An import path can only end with a '.ts' extension.", "app/a.tsx(10,2): error TS18046: 'v' is of type 'unknown'.", ''].join('\n');
+assert.deepEqual(tscLinesFor(tscOutput, 'app/a.tsx'), ["app/a.tsx(7,89): error TS2345: Argument of type 'X' is not assignable.", "  Type 'unknown' is not assignable to type 'string'.", "app/a.tsx(10,2): error TS18046: 'v' is of type 'unknown'."]);
+assert.deepEqual(tscLinesFor(tscOutput, 'lib/b.ts'), ["lib/b.ts(1,1): error TS5097: An import path can only end with a '.ts' extension."]);
+assert.deepEqual(tscLinesFor(tscOutput, 'app/none.ts'), []);
+const eslintOutput = JSON.stringify([{filePath: path.join(root, 'app', 'c.tsx'), errorCount: 1, warningCount: 1, messages: [{severity: 2, line: 4, column: 9, ruleId: 'no-unused-vars', message: 'x is unused'}, {severity: 1, line: 5, column: 1, ruleId: 'warn-rule', message: 'only a warning'}]}]);
+assert.deepEqual(eslintLinesFor(eslintOutput, 'app/c.tsx'), ['app/c.tsx:4:9 no-unused-vars: x is unused']);
+console.log('Ratchet error details passed.');
