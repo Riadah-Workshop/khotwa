@@ -48,7 +48,7 @@ export async function GET(req:Request){
   if(!row)return response({error:'الإيصال غير موجود'},404);
   // The parent who sent it, or cafeteria staff who may review transfers in that very cafeteria (never another cafeteria's).
   const own=access.role==='parent'&&row.parent_phone===access.parentPhone;
-  if(!own&&!await permittedCafeteria({...access,userId:user.userId},row.cafeteria_id,true,'transfers_review'))return response({error:'غير مصرح'},403);
+  if(!own&&!(access.role==='main_admin'||access.role==='fushati_admin'))return response({error:'غير مصرح'},403);
   const object=await store()?.get(row.receipt_key);if(!object)return response({error:'ملف الإيصال غير متاح'},404);
   return new Response(object.body,{headers:{'Cache-Control':'private, no-store','Content-Type':row.receipt_mime,'Content-Disposition':`attachment; filename="fushati-receipt-${id}.${row.receipt_mime==='application/pdf'?'pdf':'img'}"`,'X-Content-Type-Options':'nosniff','Content-Security-Policy':"sandbox; default-src 'none'"}});
  }catch{return response({error:'تعذر تحميل الإيصال'},503);}

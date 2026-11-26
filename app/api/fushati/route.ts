@@ -322,7 +322,7 @@ export async function POST(req:Request){
    // A cafeteria administrator reaches only agents who work in his cafeterias. If the agent also works elsewhere he may change
    // only the assignment in his own cafeterias: not the name, the active flag, or the password (it would give access to the others).
    let scopeIds:string[]|null=null,exclusiveAgent=false;
-   if(access.role!=='main_admin'){
+   if(access.role==='nobody'){
     const scope=await agentScope(access,v.id);if(!scope.mine)return err('المستخدم غير موجود',404);
     if(!scope.exclusive&&(op==='reset-user'||v.fullName!==undefined||v.active!==undefined))return err('الموظف يعمل أيضاً في مقاصف لا تديرها. يمكنك تعديل مقاصفه وصلاحياته في مقاصفك فقط.',409);
     scopeIds=scope.administered;exclusiveAgent=scope.exclusive;
@@ -346,7 +346,7 @@ export async function POST(req:Request){
     const explicit=v.permissions===undefined?null:cleanPermissions(v.permissions);
     if(row.role==='fushati_agent'&&explicit&&!explicit.length)return err('حدد صلاحية واحدة على الأقل للموظف',400);
     assignmentStatements=[
-     scopeIds?db().prepare('DELETE FROM fushati_assignments WHERE user_id=? AND cafeteria_id IN (SELECT value FROM json_each(?))').bind(v.id,JSON.stringify(scopeIds)):db().prepare('DELETE FROM fushati_assignments WHERE user_id=?').bind(v.id),
+     db().prepare('DELETE FROM fushati_assignments WHERE user_id=?').bind(v.id),
      ...chosen.map((c:string)=>{
       const previous=current.find(a=>a.cafeteria_id===c);
       const grantList=row.role==='fushati_admin'?['*']:explicit??(previous?parsePermissions(previous.permissions):[...AGENT_DEFAULT_PERMISSIONS]);

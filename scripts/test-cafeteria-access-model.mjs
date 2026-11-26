@@ -10,6 +10,13 @@
 // Each rule is checked in both directions: the allowed action works, the same action on somebody else's cafeteria
 // is refused, and the other cafeteria's data is unchanged afterwards.
 import assert from 'node:assert/strict';
+const SOFT_FAILURES = [];
+for (const key of Object.keys(assert)) {
+  if (typeof assert[key] !== 'function' || key === 'AssertionError') continue;
+  const original = assert[key];
+  assert[key] = (...args) => { try { return original(...args); } catch (error) { SOFT_FAILURES.push(String(error.message).split('\n')[0]); } };
+}
+process.on('exit', () => { if (SOFT_FAILURES.length) { console.error('SOFT FAILURES (' + SOFT_FAILURES.length + '):\n' + SOFT_FAILURES.map((line) => ' * ' + line).join('\n')); process.exitCode = 1; } });
 import {assertOnlySchool, createHarness, PASSWORD} from './support/school-harness.mjs';
 import {seedCafeterias} from './support/cafeteria-seed.mjs';
 
