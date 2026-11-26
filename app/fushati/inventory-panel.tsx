@@ -11,6 +11,9 @@ import type {Movement, MoveKind, StockItem} from './stock-ui';
 
 type ItemsState = {key: string; cafeteriaId: string; items: StockItem[]; canManage: boolean; error: string};
 type HistoryState = {key: string; movements: Movement[]; error: string};
+type ItemsBody = {error?: string; items?: StockItem[]; canManage?: boolean};
+type HistoryBody = {error?: string; movements?: Movement[]};
+type PostBody = {error?: string; onHand?: number};
 type Editing = {id: string; mode: MoveKind | 'setup'; requestId: string};
 type Filter = 'all' | 'attention' | 'untracked';
 
@@ -20,7 +23,7 @@ const KIND_ICONS: Record<MoveKind, ReactNode> = {
 
 async function post(op: string, data: unknown) {
   const res = await fetch('/api/fushati/inventory', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({op, data})});
-  const body = await res.json().catch(() => ({}));
+  const body = (await res.json().catch(() => ({}))) as PostBody;
   if (!res.ok) throw new Error(body.error || 'Request failed');
   return body;
 }
@@ -56,7 +59,7 @@ export default function InventoryPanel({cafeteriaId, language}: {cafeteriaId: st
     if (!cafeteriaId) return;
     let live = true;
     fetch('/api/fushati/inventory?' + new URLSearchParams({op: 'items', cafeteriaId}), {cache: 'no-store'})
-      .then(async res => { const body = await res.json(); if (!res.ok) throw new Error(body.error || 'Request failed'); return body; })
+      .then(async res => { const body = (await res.json()) as ItemsBody; if (!res.ok) throw new Error(body.error || 'Request failed'); return body; })
       .then(body => { if (live) setState({key: itemsKey, cafeteriaId, items: body.items || [], canManage: !!body.canManage, error: ''}); })
       .catch(e => { if (live) setState(previous => ({key: itemsKey, cafeteriaId, items: previous?.cafeteriaId === cafeteriaId ? previous.items : [], canManage: false, error: e instanceof Error ? e.message : String(e)})); });
     return () => { live = false; };
@@ -68,7 +71,7 @@ export default function InventoryPanel({cafeteriaId, language}: {cafeteriaId: st
     const query = new URLSearchParams({op: 'history', cafeteriaId, days: String(days)});
     if (menuFilter) query.set('menuId', menuFilter);
     fetch('/api/fushati/inventory?' + query.toString(), {cache: 'no-store'})
-      .then(async res => { const body = await res.json(); if (!res.ok) throw new Error(body.error || 'Request failed'); return body; })
+      .then(async res => { const body = (await res.json()) as HistoryBody; if (!res.ok) throw new Error(body.error || 'Request failed'); return body; })
       .then(body => { if (live) setHistory({key: historyKey, movements: body.movements || [], error: ''}); })
       .catch(e => { if (live) setHistory({key: historyKey, movements: [], error: e instanceof Error ? e.message : String(e)}); });
     return () => { live = false; };

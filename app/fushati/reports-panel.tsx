@@ -28,7 +28,7 @@ export default function ReportsPanel({language, selectedCafeteriaId}: {language:
   useEffect(() => {
     let live = true;
     fetch('/api/fushati/reports?op=catalog', {cache: 'no-store'})
-      .then(async res => { const body = await res.json(); if (!res.ok) throw new Error(body.error || 'Request failed'); return body as CatalogState; })
+      .then(async res => { const body = (await res.json()) as CatalogState & {error?: string}; if (!res.ok) throw new Error(body.error || 'Request failed'); return body as CatalogState; })
       .then(body => {
         if (!live) return;
         setCatalog(body);
@@ -52,7 +52,7 @@ export default function ReportsPanel({language, selectedCafeteriaId}: {language:
     if (!chosen || problem || !from || !to) return;
     let live = true;
     fetch(reportUrl(chosen.id, scopeNow, from, to), {cache: 'no-store'})
-      .then(async res => { const body = await res.json(); if (!res.ok) throw new Error(body.error || 'Request failed'); return body as ReportRun; })
+      .then(async res => { const body = (await res.json()) as ReportRun & {error?: string}; if (!res.ok) throw new Error(body.error || 'Request failed'); return body as ReportRun; })
       .then(body => { if (live) setResult({key: runKey, run: body, error: ''}); })
       .catch(e => { if (live) setResult({key: runKey, run: null, error: e instanceof Error ? e.message : String(e)}); });
     return () => { live = false; };
