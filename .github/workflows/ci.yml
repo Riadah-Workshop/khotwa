@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Least privilege: these jobs only read the repository.
+permissions:
+  contents: read
+
+# A new push to the same pull request cancels the older, now-useless run.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: 'true'
+  WRANGLER_SEND_METRICS: 'false'
+
+# Actions are pinned to full commit SHAs (the comment names the release) so a
+# moved tag cannot change what runs here.
+jobs:
+  tests:
+    name: Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # package.json pins pnpm through "packageManager"; corepack provides that exact version.
+      - name: Enable pnpm
+        run: corepack enable
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install dependencies (lockfile must match package.json)
+        run: corepack pnpm install --frozen-lockfile
+      - name: Run tests
+        run: corepack pnpm test
