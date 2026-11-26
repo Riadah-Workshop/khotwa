@@ -55,7 +55,8 @@ POLICY['/api/parent/status'] = ['parent'];
 POLICY['/api/parent/password'] = ['parent'];
 POLICY['/api/fushati'] = ['admin', 'adminInSchool', 'manager', 'parent', 'fushatiAdmin', 'fushatiAgent']; // managers: GET only
 POLICY['/api/fushati/receipts'] = ['admin', 'adminInSchool', 'parent', 'fushatiAdmin', 'fushatiAgent'];
-POLICY['/api/webhooks/resend'] = EVERYONE; // public: it verifies the sender's signature itself
+POLICY['/api/webhooks/resend'] = EVERYONE; // public: the gateway skips the session check, the route verifies the sender's signature
+const PUBLIC_ROUTES = new Set(['/api/webhooks/resend']); // no session, so no role rule (not even the manager's read-only rule) applies
 // -----------------------------------------------------------------------------------------------------
 
 const PAGES = {
@@ -87,8 +88,8 @@ try {
     for (const actor of EVERYONE) {
       const allowedRoles = POLICY[route];
       await expect(actor, route, 'GET', allowedRoles.includes(actor));
-      // Writes: same as reads, except the read-only school manager can never write.
-      await expect(actor, route, 'POST', allowedRoles.includes(actor) && actor !== 'manager');
+      // Writes: same as reads, except the read-only school manager can never write (public routes have no session rules at all).
+      await expect(actor, route, 'POST', allowedRoles.includes(actor) && (actor !== 'manager' || PUBLIC_ROUTES.has(route)));
     }
   }
   for (const [page, allowedRoles] of Object.entries(PAGES)) {
