@@ -6,10 +6,10 @@ import {hashPassword,verifyPassword,temporaryPassword} from '../../../lib/accoun
 import {parentLinkedSchools} from '../../../lib/parent-identities';
 import {tableName} from '../../../lib/school-sql';
 import {parentPhone as normalizeParentPhone} from '../../../lib/parent-view';
-import {normalizeAgentIdentifier} from '../../../lib/fushati/identifiers';
+import {normalizeAgentIdentifier,normalizeContactPhone} from '../../../lib/fushati/identifiers';
 import {issueFushatiInvite} from '../../../lib/fushati/invitations';
 import {AGENT_DEFAULT_PERMISSIONS,cleanPermissions,grantAdministers,grantAllows,parsePermissions,type FushatiPermission} from '../../../lib/fushati/permissions';
-import {db,response,now,keyDate,moneyMinor,moneySar,isCafeStaff,permittedCafeteria,cafeteriaGrants,permittedStudent,activeStudent,getOrCreateAccount,makePermanentCard,makeQrToken,readQrToken,audit} from '../../../lib/fushati/core';
+import {db,response,now,keyDate,mustChange,moneyMinor,moneySar,isCafeStaff,permittedCafeteria,cafeteriaGrants,permittedStudent,activeStudent,getOrCreateAccount,makePermanentCard,makeQrToken,readQrToken,audit} from '../../../lib/fushati/core';
 export const dynamic='force-dynamic';
 const id=z.string().uuid();
 const schoolId=z.string().regex(/^(default|[a-f0-9]{12})$/);
@@ -35,11 +35,6 @@ function rateError(e:unknown){
 }
 async function current(){const [access,user]=await Promise.all([getKhotwaAccess(),getChatGPTUser()]);return access&&user?{...access,userId:user.userId,email:user.email}:null;}
 function staffReady(row:any){return !row?.must_change_password;}
-async function mustChange(access:{role:string;userId:string}){
- if(access.role==='main_admin'||access.role==='parent'||access.role==='manager')return false;
- const row=await db().prepare('SELECT must_change_password FROM fushati_users WHERE id=? AND active=1').bind(access.userId).first<{must_change_password:number}>();
- return !row||row.must_change_password===1;
-}
 // The cafeterias this user may reach (see cafeteriaGrants): everything for the system administrator, otherwise only the assigned ones.
 async function cafesFor(access:{role:string;userId:string}){
  const ids=[...(await cafeteriaGrants(access)).keys()];
@@ -121,7 +116,7 @@ export async function GET(req:Request){
    const stockVisible=new Set<string>(JSON.parse(idsWith('inventory_view')));
    const menu=(await db().prepare('SELECT m.*,COALESCE(inv.tracked,0) AS stock_tracked,COALESCE(inv.on_hand,0) AS stock_qty,COALESCE(inv.low_stock_threshold,5) AS low_stock_threshold FROM fushati_menu_items m LEFT JOIN fushati_inventory inv ON inv.menu_item_id=m.id WHERE m.cafeteria_id IN (SELECT value FROM json_each(?)) ORDER BY m.created_at DESC').bind(JSON.stringify(cafes.map(c=>c.id))).all<any>()).results.map(m=>stockVisible.has(m.cafeteria_id)?m:{...m,stock_tracked:0,stock_qty:0,low_stock_threshold:5});
    const assignments=(await db().prepare(platform?'SELECT user_id,cafeteria_id,permissions FROM fushati_assignments':'SELECT user_id,cafeteria_id,permissions FROM fushati_assignments WHERE cafeteria_id IN (SELECT value FROM json_each(?))').bind(...(platform?[]:[administered])).all<{user_id:string;cafeteria_id:string;permissions:string}>()).results.map(a=>({user_id:a.user_id,cafeteria_id:a.cafeteria_id,permissions:parsePermissions(a.permissions)}));
-   const users=(await db().prepare(platform?'SELECT id,email,login_identifier,full_name,role,active,must_change_password,activated_at,created_at FROM fushati_users ORDER BY created_at DESC':"SELECT id,email,login_identifier,full_name,role,active,must_change_password,activated_at,created_at FROM fushati_users WHERE role='fushati_agent' AND id IN (SELECT user_id FROM fushati_assignments WHERE cafeteria_id IN (SELECT value FROM json_each(?))) ORDER BY created_at DESC").bind(...(platform?[]:[administered])).all<any>()).results;
+   const users=(await db().prepare(platform?'SELECT id,email,login_identifier,phone,full_name,role,active,must_change_password,activated_at,created_at FROM fushati_users ORDER BY created_at DESC':"SELECT id,email,login_identifier,phone,full_name,role,active,must_change_password,activated_at,created_at FROM fushati_users WHERE role='fushati_agent' AND id IN (SELECT user_id FROM fushati_assignments WHERE cafeteria_id IN (SELECT value FROM json_each(?))) ORDER BY created_at DESC").bind(...(platform?[]:[administered])).all<any>()).results;
    const transfers=(await db().prepare('SELECT t.id,t.cafeteria_id,t.account_id,t.parent_phone,t.amount_minor,t.bank_reference,t.status,t.created_at,t.review_note,a.student_id,a.school_id FROM fushati_transfers t JOIN fushati_accounts a ON a.id=t.account_id WHERE t.cafeteria_id IN (SELECT value FROM json_each(?)) ORDER BY t.created_at DESC LIMIT 300').bind(idsWith('transfers_review')).all<any>()).results;
    const paid=(await db().prepare('SELECT p.cafeteria_id,p.total_minor,p.created_at FROM fushati_purchases p WHERE p.posted=1 AND p.cafeteria_id IN (SELECT value FROM json_each(?)) ORDER BY p.created_at DESC LIMIT 1000').bind(idsWith('sales_view')).all<any>()).results;
    const mustChangePassword=await mustChange(access);
@@ -286,19 +281,21 @@ export async function POST(req:Request){
    await audit(access.userId,op,'cafeteria',v.id);return response({ok:true});
   }
   if(op==='create-user'){
-   const v=parse(data,z.object({fullName:name,email:email.optional(),identifier:z.string().trim().max(100).optional(),role:z.enum(['fushati_admin','fushati_agent']),cafeteriaIds:z.array(id).max(100),permissions:z.array(z.string()).max(30).optional()}));
+   const v=parse(data,z.object({fullName:name,email:email.optional(),identifier:z.string().trim().max(100).optional(),phone:z.string().trim().max(30).optional(),role:z.enum(['fushati_admin','fushati_agent']),cafeteriaIds:z.array(id).max(100),permissions:z.array(z.string()).max(30).optional()}));
    if(v.role==='fushati_admin'&&access.role!=='main_admin')return err('إنشاء مدير فسحتي لمدير نظام خطوة فقط',403);
    if(!v.cafeteriaIds.length)return err(v.role==='fushati_admin'?'يجب تحديد مقصف واحد على الأقل للمدير':'يجب تحديد مقصف للموظف',400);
    const grantList=v.role==='fushati_admin'?['*']:cleanPermissions(v.permissions??AGENT_DEFAULT_PERMISSIONS);
    if(v.role==='fushati_agent'&&!grantList.length)return err('حدد صلاحية واحدة على الأقل للموظف',400);
    const cafes=await cafesFor(access);if(v.cafeteriaIds.some((a:string)=>!cafes.some(c=>c.id===a&&c.active)))return err('أحد المقاصف غير متاح',403);
+   const contactPhone=v.phone?normalizeContactPhone(v.phone):'';
+   if(v.phone&&!contactPhone)return err('رقم الجوال غير صحيح: أدخل رقماً سعودياً مثل 0512345678',400);
    const userId=crypto.randomUUID(),isManager=v.role==='fushati_admin';
    const identifier=isManager?'':normalizeAgentIdentifier(v.identifier||'');
    if(isManager&&!v.email)return err('البريد الإلكتروني لمدير فسحتي مطلوب',400);
    if(!isManager&&!identifier)return err('أدخل رقم جوال سعودي صحيح أو رقم هوية/إقامة مكوناً من 10 أرقام',400);
    const accountEmail=isManager?v.email!:`agent-${userId}@fushati.invalid`;
    const password=isManager?'':temporaryPassword(),hash=isManager?'!pending-email-activation!':await hashPassword(password);
-   await db().batch([db().prepare('INSERT INTO fushati_users(id,email,login_identifier,full_name,role,password_hash,must_change_password,activated_at,created_at) VALUES(?,?,?,?,?,?,?,?,?)').bind(userId,accountEmail,identifier,v.fullName,v.role,hash,isManager?0:1,isManager?null:now(),now()),...v.cafeteriaIds.map((c:string)=>db().prepare('INSERT INTO fushati_assignments(user_id,cafeteria_id,permissions) VALUES(?,?,?)').bind(userId,c,JSON.stringify(grantList)))]);
+   await db().batch([db().prepare('INSERT INTO fushati_users(id,email,login_identifier,full_name,role,password_hash,must_change_password,activated_at,created_at,phone) VALUES(?,?,?,?,?,?,?,?,?,?)').bind(userId,accountEmail,identifier,v.fullName,v.role,hash,isManager?0:1,isManager?null:now(),now(),contactPhone),...v.cafeteriaIds.map((c:string)=>db().prepare('INSERT INTO fushati_assignments(user_id,cafeteria_id,permissions) VALUES(?,?,?)').bind(userId,c,JSON.stringify(grantList)))]);
    await audit(access.userId,op,'user',userId);
    if(isManager){const delivery=await issueFushatiInvite(db(),env,{id:userId,email:accountEmail,full_name:v.fullName});return response({ok:true,id:userId,invitationStatus:delivery.status,invitationErrorCode:delivery.errorCode||null});}
    return response({ok:true,id:userId,loginIdentifier:v.identifier,temporaryPassword:password});
@@ -316,7 +313,7 @@ export async function POST(req:Request){
    await audit(access.userId,op,'user',v.id);return response({ok:true});
   }
   if(op==='edit-user'||op==='reset-user'){
-   const v=parse(data,z.object({id,fullName:name.optional(),active:flag.optional(),cafeteriaIds:z.array(id).max(100).optional(),permissions:z.array(z.string()).max(30).optional()}));
+   const v=parse(data,z.object({id,fullName:name.optional(),phone:z.string().trim().max(30).optional(),active:flag.optional(),cafeteriaIds:z.array(id).max(100).optional(),permissions:z.array(z.string()).max(30).optional()}));
    const row=await db().prepare('SELECT * FROM fushati_users WHERE id=?').bind(v.id).first<any>();if(!row)return err('المستخدم غير موجود',404);
    if(row.role==='fushati_admin'&&access.role!=='main_admin')return err('لا يمكن تعديل مدير فسحتي',403);
    // A cafeteria administrator reaches only agents who work in his cafeterias. If the agent also works elsewhere he may change
@@ -324,7 +321,7 @@ export async function POST(req:Request){
    let scopeIds:string[]|null=null,exclusiveAgent=false;
    if(access.role!=='main_admin'){
     const scope=await agentScope(access,v.id);if(!scope.mine)return err('المستخدم غير موجود',404);
-    if(!scope.exclusive&&(op==='reset-user'||v.fullName!==undefined||v.active!==undefined))return err('الموظف يعمل أيضاً في مقاصف لا تديرها. يمكنك تعديل مقاصفه وصلاحياته في مقاصفك فقط.',409);
+    if(!scope.exclusive&&(op==='reset-user'||v.fullName!==undefined||v.active!==undefined||v.phone!==undefined))return err('الموظف يعمل أيضاً في مقاصف لا تديرها. يمكنك تعديل مقاصفه وصلاحياته في مقاصفك فقط.',409);
     scopeIds=scope.administered;exclusiveAgent=scope.exclusive;
    }
    if(op==='reset-user'){
@@ -336,6 +333,8 @@ export async function POST(req:Request){
     const password=temporaryPassword();await db().prepare('UPDATE fushati_users SET password_hash=?,must_change_password=1,session_version=session_version+1 WHERE id=?').bind(await hashPassword(password),v.id).run();
     await audit(access.userId,op,'user',v.id);return response({ok:true,loginIdentifier:row.login_identifier,temporaryPassword:password});
    }
+   const newPhone=v.phone===undefined?row.phone:v.phone===''?'':normalizeContactPhone(v.phone);
+   if(v.phone&&!newPhone)return err('رقم الجوال غير صحيح: أدخل رقماً سعودياً مثل 0512345678',400);
    if(v.cafeteriaIds){const cafes=await cafesFor(access);if(v.cafeteriaIds.some((c:string)=>!cafes.some(x=>x.id===c&&x.active)))return err('لا يمكنك تعيين موظف لمقصف غير متاح',403);}
    const changeAssignments=v.cafeteriaIds!==undefined||v.permissions!==undefined;
    let assignmentStatements:D1PreparedStatement[]=[];
@@ -355,7 +354,7 @@ export async function POST(req:Request){
     ];
    }
    await db().batch([
-    db().prepare('UPDATE fushati_users SET full_name=?,active=?,session_version=session_version+1 WHERE id=?').bind(v.fullName??row.full_name,v.active===undefined?row.active:v.active?1:0,v.id),
+    db().prepare('UPDATE fushati_users SET full_name=?,active=?,phone=?,session_version=session_version+1 WHERE id=?').bind(v.fullName??row.full_name,v.active===undefined?row.active:v.active?1:0,newPhone,v.id),
     ...assignmentStatements
    ]);
    await audit(access.userId,op,'user',v.id);return response({ok:true});
