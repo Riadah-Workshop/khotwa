@@ -13,7 +13,7 @@ export async function GET(req:Request){
  const user=await getChatGPTUser();if(!serviceAllowed&&!user)return Response.json({error:'يرجى تسجيل الدخول'},{status:401});
  try{
   // D1 batch provides one transactional read of all tables, including complete audit summaries.
-  const tables:string[]=[...TABLES,...((canAccessCare(user?.email)||['main_admin','deputy'].includes((await getKhotwaAccess())?.role||''))?['student_care','care_intake']:[])],keys=[...KEYS,...((canAccessCare(user?.email)||['main_admin','deputy'].includes((await getKhotwaAccess())?.role||''))?['studentCare','careIntake']:[])];
+  const careAllowed=canAccessCare((await getKhotwaAccess())?.role);const tables:string[]=[...TABLES,...(careAllowed?['student_care','care_intake']:[])],keys=[...KEYS,...(careAllowed?['studentCare','careIntake']:[])];
   const result=await getTenantDb().batch(tables.map(table=>getTenantDb().prepare(`SELECT * FROM ${table}`)));
   const data:Record<string,unknown>={format:'shuoon-independent-v1',exportedAt:new Date().toISOString()};
   for(let i=0;i<tables.length;i++){

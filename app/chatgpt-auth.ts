@@ -104,7 +104,6 @@ export async function getKhotwaAccess(): Promise<{role:'main_admin'|'deputy'|'ma
 // Call before reading a write payload or touching storage / upstream services.
 // Service callers without a visitor identity still use their existing secret checks.
 export async function denyReadOnlyWrite(): Promise<Response | null> {
-  const user = await getChatGPTUser();
   const access=await getKhotwaAccess();
-  return access?.role==='deputy'||access?.role==='main_admin'?null:readOnlyWriteResponse(user?.email);
+  return readOnlyWriteResponse(access?.role);
 }
