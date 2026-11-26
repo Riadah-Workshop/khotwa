@@ -79,7 +79,7 @@ try {
   await expectStatus(get(supervisor, `op=export&cafeteriaId=${cafe.b}`), 403, 'reports is not granted in cafeteria b');
   await expectStatus(get(supervisor, `op=balances&cafeteriaId=${cafe.a}`), 403, 'balances_view is not granted anywhere');
   await expectStatus(post(supervisor, 'stock-adjust', {menuId: menu.a, delta: 1, tracked: true, threshold: 5, reason: 'correction'}), 403, 'inventory_view is not inventory_manage');
-  await expectStatus(post(supervisor, 'edit-menu', {id: menu.a, name: 'x', category: 'x', price: '1', active: true, available: true}), 403, 'menu_manage is not granted');
+  await expectStatus(post(supervisor, 'edit-menu', {id: menu.a, name: 'xx', category: 'x', price: '1', active: true, available: true}), 403, 'menu_manage is not granted');
   await expectStatus(post(supervisor, 'review-transfer', {id: transfer.a, status: 'approved'}), 403, 'transfers_review is not granted');
   for (const [op, data] of [['set-alias', {id: cafe.a, alias: 'mine'}], ['create-user', {fullName: 'Intruder', identifier: '0512345699', role: 'fushati_agent', cafeteriaIds: [cafe.a]}], ['edit-user', {id: ids.agent1, active: false}], ['reset-user', {id: ids.agent1}], ['delete-user', {id: ids.agent1}]]) {
     await expectStatus(post(supervisor, op, data), 403, `a supervisor cannot ${op}: granting is for administrators`);
