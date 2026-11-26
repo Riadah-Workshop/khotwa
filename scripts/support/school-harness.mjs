@@ -128,7 +128,12 @@ export async function createHarness() {
   }
   const insertRow = (school, table, row) => tenancy.runWithSchool({schoolId: school.id, role: 'main_admin', identity: 'seed'}, async () => {
     const names = facts[table].columns.map((column) => column.name);
-    await tenancy.getTenantDb().prepare(`INSERT INTO ${table}(${names.join(',')}) VALUES(${names.map(() => '?').join(',')})`).bind(...names.map((name) => row[name])).run();
+    try {
+      await tenancy.getTenantDb().prepare(`INSERT INTO ${table}(${names.join(',')}) VALUES(${names.map(() => '?').join(',')})`).bind(...names.map((name) => row[name])).run();
+    } catch (error) {
+      // Each school is seeded with its own, distinct keys, so a clash means the rows went to somebody else's tables.
+      throw new Error(`Seeding ${table} for school "${school.id}" failed: ${error.message}. A UNIQUE or FOREIGN KEY error here usually means tenant isolation is broken (rows written for one school landed in another school's tables, e.g. a tenant database cached across requests).`, {cause: error});
+    }
   });
 
   const seeded = {};
