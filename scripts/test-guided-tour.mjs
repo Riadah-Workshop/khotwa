@@ -8,7 +8,7 @@ import ts from 'typescript';
 
 function load(file) {
   const exports = {};
-  new Function('exports', ts.transpileModule(fs.readFileSync(file, 'utf8'), {compilerOptions: {module: ts.ModuleKind.CommonJS}}).outputText)(exports);
+  new Function('exports', ts.transpileModule(fs.readFileSync(file, 'utf8'), {compilerOptions: {module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES5}}).outputText)(exports);
   return exports;
 }
 const logic = load('app/ui/tour-logic.ts');
