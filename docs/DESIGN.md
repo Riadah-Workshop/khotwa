@@ -49,6 +49,23 @@ browser, can be skipped, and can be replayed with the help button in the top bar
 - `scripts/test-guided-tour.mjs` checks that every step has Arabic and English text, that every
   highlighted element exists in the files listed in `TOUR_SOURCES`, and the placement and storage logic.
 
+## Cafeteria screens (Fushati)
+
+The cafeteria administrator and agent screens (`app/fushati/`) use the same kit: a coloured top bar, a
+cafeteria selector card, icon tabs (Overview, Cafeterias, Map and attendance, Products, **Inventory**,
+Staff, Transfers, Sales and balances, **Reports**, Security), and a page heading with a one-line
+description on every tab. Administrators use the teal accent and agents the green one.
+
+- `inventory-panel.tsx` (stock cards, receive / return / waste / damage / expired / stock-count forms,
+  movement history) and `reports-panel.tsx` (report picker, date range, table, totals, CSV, print) talk to
+  `/api/fushati/inventory` and `/api/fushati/reports` (Phase 2 back end). Pure helpers are in
+  `stock-ui.ts` and `report-ui.ts` and are tested by `scripts/test-cafeteria-ui.mjs`.
+- Two tours: `cafeteria-admin` (13 steps) and `cafeteria-agent` (12 steps). Steps whose tab the person
+  cannot see (for example inventory without the inventory permission, or the backup step for anyone but the
+  system administrator) are skipped automatically.
+- Each panel is keyed by the selected cafeteria, so switching cafeteria always reloads its own data and never
+  shows another cafeteria's numbers for a moment.
+
 ## Adding a screen or a step
 
 1. Put new text in both languages. 2. Reuse a tone and an icon that already mean the same thing elsewhere.

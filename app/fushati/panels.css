@@ -1,0 +1,66 @@
+/* Cafeteria inventory and reports screens. Colours and layout come from app/ui/kx.css; only what is specific here. */
+
+/* ---- inventory ---- */
+.cfi-filters{display:flex;gap:12px;flex-wrap:wrap;align-items:center;justify-content:space-between}
+.cfi-chips{display:flex;gap:8px;flex-wrap:wrap}
+.cfi-chips .kx-btn b{font-variant-numeric:tabular-nums}
+.cfi-search{flex:1 1 220px;max-inline-size:340px}
+.cfi-search-box{position:relative;display:block}
+.cfi-search-box svg{position:absolute;inset-block-start:50%;inset-inline-start:12px;transform:translateY(-50%);color:var(--kx-muted);pointer-events:none}
+.cfi-search-box .kx-input{padding-inline-start:36px}
+.cfi-items{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px}
+.cfi-item{display:grid;gap:12px;align-content:start;padding:16px;border-radius:16px;border:1px solid var(--kx-border);border-inline-start:5px solid var(--kx-slate-line);background:#fff}
+.cfi-item[data-status=ok]{border-inline-start-color:var(--kx-green-solid)}
+.cfi-item[data-status=low]{border-inline-start-color:var(--kx-amber-solid)}
+.cfi-item[data-status=out]{border-inline-start-color:var(--kx-red-solid)}
+.cfi-item header{display:flex;gap:10px;align-items:flex-start;justify-content:space-between}
+.cfi-item header strong{display:block;font-size:16px;line-height:1.3;overflow-wrap:anywhere}
+.cfi-item header small{display:block;color:var(--kx-muted);font-size:13px}
+.cfi-facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:0}
+.cfi-facts div{padding:8px 10px;border-radius:10px;background:var(--kx-slate-bg);min-width:0}
+.cfi-facts dt{font-size:12px;color:var(--kx-muted)}
+.cfi-facts dd{margin:0;font-weight:700;font-size:14.5px;font-variant-numeric:tabular-nums}
+.cfi-facts .cfi-onhand{font-size:20px}
+.cfi-form{display:grid;gap:12px;padding:14px;border-radius:14px;background:var(--kx-slate-bg);border:1px solid var(--kx-slate-line)}
+.cfi-hint{margin:0;font-size:14px;color:var(--kx-muted)}
+.cfi-kind{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;background:var(--t-bg);color:var(--t-ink);font-weight:700;margin-inline-end:6px}
+.cfi-preview{margin:0;padding:9px 12px;border-radius:10px;background:var(--kx-green-bg);color:var(--kx-green-ink);font-weight:700;font-size:14.5px}
+.cfi-preview.is-bad{background:var(--kx-red-bg);color:var(--kx-red-ink)}
+.cfi-wide{grid-column:1/-1}
+.cfi-history-filters{display:flex;gap:8px;flex-wrap:wrap}
+.cfi-history-filters .kx-select{min-inline-size:150px}
+.cfi-history li{align-items:flex-start}
+.cfi-move-main{display:grid;gap:4px;justify-items:start;min-width:0}
+.cfi-move-main small{color:var(--kx-muted);font-size:13px}
+.cfi-move-side{display:grid;justify-items:end;gap:2px;flex:none;text-align:end}
+.cfi-move-side b{font-size:17px;font-variant-numeric:tabular-nums}
+.cfi-move-side .is-plus{color:var(--kx-green-ink)}
+.cfi-move-side .is-minus{color:var(--kx-red-ink)}
+.cfi-move-side small{color:var(--kx-muted);font-size:12.5px}
+
+/* ---- reports ---- */
+.cfr-dates{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.cfr-group{display:grid;gap:10px;padding-block-start:6px}
+.cfr-group h3{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0;font-size:16px}
+.cfr-group h3 small{font-weight:400;color:var(--kx-muted);font-size:13.5px}
+.cfr-picks{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}
+.cfr-pick{display:grid;gap:4px;align-content:start;text-align:start;padding:12px 14px;border-radius:14px;border:1px solid var(--kx-border);background:#fff;color:var(--kx-text);font:inherit;cursor:pointer;min-height:44px}
+.cfr-pick:hover{background:var(--t-bg)}
+.cfr-pick strong{font-size:14.5px}
+.cfr-pick small{color:var(--kx-muted);font-size:12.5px;line-height:1.4}
+.cfr-pick.is-on{background:var(--t-bg);border-color:var(--t-solid);box-shadow:inset 0 0 0 1px var(--t-solid)}
+.cfr-table th.is-num,.cfr-table td.is-num{text-align:end;font-variant-numeric:tabular-nums;white-space:nowrap}
+.cfr-table tfoot td{font-weight:800;background:var(--kx-slate-bg);border-block-start:2px solid var(--kx-slate-line)}
+.cfr-foot{margin:0;color:var(--kx-muted);font-size:13px}
+.cfr-actions a[aria-disabled=true]{opacity:.55;pointer-events:none}
+
+@media(max-width:560px){
+ .cfi-items{grid-template-columns:minmax(0,1fr)}
+ .cfi-facts{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .cfr-dates{grid-template-columns:minmax(0,1fr)}
+ .cfr-picks{grid-template-columns:minmax(0,1fr)}
+}
+@media print{
+ [data-tour=cfa-report-picker],.cfr-actions,.cfi-actions,.cfi-filters,.cfi-form{display:none!important}
+ .cfi-item,.kx-card{break-inside:avoid}
+}
