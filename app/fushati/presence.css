@@ -1,0 +1,27 @@
+.fs-presence-head, .fs-log-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; }
+.fs-presence-grid { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 18px; margin-top: 10px; }
+@media (max-width: 860px) { .fs-presence-grid { grid-template-columns: minmax(0, 1fr); } }
+.fs-legend { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; margin: 8px 0; font-size: 13px; }
+.fs-dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-inline-end: 4px; vertical-align: middle; }
+.fs-dot-cafe { background: #0f766e; border-radius: 3px; }
+.fs-dot-live { background: #16a34a; }
+.fs-dot-stale { background: #9ca3af; }
+.fs-selected { margin: 8px 0; padding: 10px 12px; border-radius: 10px; background: #ecfdf5; border: 1px solid #a7f3d0; font-size: 14px; line-height: 1.6; }
+.fs-muted { color: #5b6b66; font-size: 13px; }
+.fs-agents { list-style: none; margin: 8px 0 14px; padding: 0; display: grid; gap: 8px; }
+.fs-agents li { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid #d7e3de; border-radius: 10px; background: #fff; }
+.fs-agents li[data-selected='true'] { border-color: #1d4ed8; box-shadow: 0 0 0 2px rgba(29, 78, 216, 0.25); }
+.fs-agent-main { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: start; background: none; border: 0; padding: 0; cursor: pointer; font: inherit; color: inherit; }
+.fs-agent-main small { color: #5b6b66; }
+.fs-agent-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.fs-call { font-weight: 600; text-decoration: none; padding: 4px 10px; border-radius: 8px; background: #e0f2fe; color: #075985; }
+.fs-link { background: none; border: 0; padding: 0 6px; color: #075985; text-decoration: underline; cursor: pointer; font: inherit; }
+.fs-locate { margin: 12px 0; padding: 12px; border: 1px dashed #0f766e; border-radius: 12px; background: #f0fdfa; }
+.fs-locate-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.fs-here { display: grid; gap: 10px; }
+.fs-here-status { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; font-size: 16px; }
+.fs-here-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.fs-here ul { margin: 0; padding-inline-start: 18px; }
+.fs-spin { animation: fs-spin 1s linear infinite; vertical-align: middle; }
+@keyframes fs-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .fs-spin { animation: none; } }

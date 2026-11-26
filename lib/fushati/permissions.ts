@@ -18,6 +18,7 @@ export const FUSHATI_PERMISSIONS = [
   'balances_view', // student account balances and limits
   'transfers_review', // approve or reject parents' bank transfers
   'reports', // export reports
+  'presence_view', // see agents on the map (name, phone, live position) and the arrival and departure log
 ] as const;
 
 export type FushatiPermission = (typeof FUSHATI_PERMISSIONS)[number];

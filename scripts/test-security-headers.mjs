@@ -71,7 +71,8 @@ for (const [name, value] of Object.entries(SECURITY_HEADERS)) assert.equal(plain
 assert.equal(plain.headers.get('content-security-policy-report-only'), REPORT_ONLY_CSP);
 assert.equal(plain.headers.get('content-type'), 'text/plain');
 assert.match(plain.headers.get('permissions-policy'), /camera=\(self\)/);
-assert.match(plain.headers.get('permissions-policy'), /geolocation=\(\)/);
+assert.match(plain.headers.get('permissions-policy'), /geolocation=\(self\)/); // the cafeteria agent's arrival check; never other origins
+assert.match(REPORT_ONLY_CSP, /img-src [^;]*https:\/\/tile\.openstreetmap\.org/); // cafeteria map tiles
 assert.doesNotMatch(plain.headers.get('strict-transport-security'), /includeSubDomains|preload/);
 
 // A route that sets its own value keeps it.

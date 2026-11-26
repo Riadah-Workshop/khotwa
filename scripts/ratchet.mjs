@@ -44,6 +44,29 @@ export function parseEslintJson(output) {
   return counts;
 }
 
+/** The tsc lines (with their continuation lines) that belong to one file, so a failed check can say what is wrong. */
+export function tscLinesFor(output, file) {
+  const lines = [];
+  let inFile = false;
+  for (const line of output.split('\n')) {
+    const match = line.match(/^(.+?)\((\d+),(\d+)\): error TS\d+:/);
+    if (match) inFile = toRelative(match[1]) === file;
+    else if (!/^\s/.test(line)) inFile = false;
+    if (inFile) lines.push(line);
+  }
+  return lines;
+}
+
+/** One line per error of one file from eslint --format json. */
+export function eslintLinesFor(output, file) {
+  const lines = [];
+  for (const entry of JSON.parse(output)) {
+    if (toRelative(entry.filePath) !== file) continue;
+    for (const message of entry.messages) if (message.severity === 2) lines.push(`${file}:${message.line}:${message.column} ${message.ruleId || 'error'}: ${message.message}`);
+  }
+  return lines;
+}
+
 /** Files that got worse, and files that got better, compared with the baseline. */
 export function compare(current, baseline) {
   const worse = [];
@@ -143,6 +166,12 @@ function main(argv) {
     console.log(`\nNew ${check.title} errors (these files have more errors than the baseline):`);
     for (const entry of worse) {
       console.log(`  ${entry.file}: ${entry.count} (baseline ${entry.allowed})`);
+      // Say what the errors are: nobody can run the checks on a phone, and the log is where the author looks.
+      try {
+        for (const line of name === 'lint' ? eslintLinesFor(result.stdout, entry.file) : tscLinesFor(result.stdout, entry.file)) console.log(`    ${line}`);
+      } catch {
+        // The counts above are enough if the output cannot be read again.
+      }
       annotate('error', entry.file, `${check.title}: ${entry.count} error(s), baseline allows ${entry.allowed}. Run \`corepack pnpm ${name === 'lint' ? 'lint' : 'typecheck'}\` locally for details.`);
     }
     console.log(`\nFix the new errors, or run \`corepack pnpm ${name === 'lint' ? 'lint' : 'typecheck'}\` to see them in full. Do not raise the baseline to hide them.`);

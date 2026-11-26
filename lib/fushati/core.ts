@@ -22,6 +22,12 @@ export const moneyMinor=(value:unknown):number|null=>{
 };
 export const moneySar=(minor:number)=>Number((minor/100).toFixed(2));
 export const db=()=>env.DB!;
+/** Staff with a temporary password may do nothing until they have chosen their own. */
+export async function mustChange(access:{role:string;userId:string}){
+ if(access.role==='main_admin'||access.role==='parent'||access.role==='manager')return false;
+ const row=await db().prepare('SELECT must_change_password FROM fushati_users WHERE id=? AND active=1').bind(access.userId).first<{must_change_password:number}>();
+ return !row||row.must_change_password===1;
+}
 export const isCafeAdmin=(access:FushatiAccess)=>access.role==='main_admin'||access.role==='fushati_admin';
 export const isCafeStaff=(access:FushatiAccess)=>isCafeAdmin(access)||access.role==='fushati_agent';
 /**

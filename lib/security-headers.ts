@@ -20,7 +20,8 @@ export const REPORT_ONLY_CSP = [
   "default-src 'self'",
   "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'",
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob:",
+  // OpenStreetMap map tiles for the cafeteria map (the only third-party host the app loads anything from).
+  "img-src 'self' data: blob: https://tile.openstreetmap.org",
   "font-src 'self' data:",
   "media-src 'self' blob:",
   "connect-src 'self'",
@@ -38,8 +39,9 @@ export const SECURITY_HEADERS: Readonly<Record<string, string>> = {
   'X-Content-Type-Options': 'nosniff',
   'X-Frame-Options': 'DENY',
   'Referrer-Policy': 'strict-origin-when-cross-origin',
-  // The barcode/QR scanner needs the camera on this origin only. Nothing else is used.
-  'Permissions-Policy': 'camera=(self), microphone=(), geolocation=(), payment=(), usb=(), bluetooth=(), serial=()',
+  // The barcode/QR scanner needs the camera, and the cafeteria agent's arrival check needs the position, on this
+  // origin only. Nothing else is used.
+  'Permissions-Policy': 'camera=(self), microphone=(), geolocation=(self), payment=(), usb=(), bluetooth=(), serial=()',
   // One year, this host only. No includeSubDomains/preload: other subdomains of the
   // domain (mail, panel) are outside this application.
   'Strict-Transport-Security': 'max-age=31536000',
