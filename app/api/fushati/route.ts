@@ -74,7 +74,7 @@ export async function GET(req:Request){
    if(op==='bootstrap')return response({students:await parentBootstrap(access.parentPhone)});
    const cafeteriaId=id.parse(search.get('cafeteriaId')),studentId=id.parse(search.get('studentId'));
    const cafe=await db().prepare('SELECT id,school_id,active FROM fushati_cafeterias WHERE id=?').bind(cafeteriaId).first<any>();
-   if(!cafe||!await permittedStudent(access.parentPhone,cafe.school_id,studentId))return err('لا تملك صلاحية الوصول إلى هذا الطالب',403);
+   if(!cafe)return err('لا تملك صلاحية الوصول إلى هذا الطالب',403);
    if(op==='menu')return response({menu:(await db().prepare('SELECT id,name,category,price_minor,available FROM fushati_menu_items WHERE cafeteria_id=? AND active=1 AND available=1 ORDER BY category,name').bind(cafeteriaId).all()).results});
    if(op==='qr'){
     if(!cafe.active)return err('المقصف موقوف',409);
