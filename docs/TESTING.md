@@ -62,6 +62,7 @@ CI; make the Tests job a required check so none of them can be bypassed.
 | `test-location.mjs` | the cafeteria module | Pure rules, no database: distances, map projection, fit-to-markers, the arrival and departure thresholds, what the agent's phone does with each position, phone-number normalisation. |
 | `test-ui-contrast.mjs` | the design kit | Every text/background colour pair of `app/ui/kx.css` meets WCAG AA contrast, so a colour change cannot make text unreadable. |
 | `test-guided-tour.mjs` | the first-login tours | Tours are shown once per platform and account, never on every load when storage is blocked; the card is always on screen and never covers what it explains; every step has Arabic and English text and every highlighted element exists in its screen (see `docs/DESIGN.md`). |
+| `test-manager-report.mjs` | the school manager dashboard | Attendance codes are shown as words in both languages; ranked-bar and column geometry (a small value is still visible, a quiet month is an empty column, not dropped); the CSV export quotes values, neutralises cells that start with `=`, `+`, `-` or `@` so Excel cannot run them as formulas, and follows the screen language. |
 
 The tests that use the full request path share `scripts/support/school-harness.mjs`
 (the runner ignores `scripts/support/`). It builds the schools, accounts and

@@ -29,6 +29,9 @@
 .kx-scope[data-accent=amber]{--kx-accent-bg:var(--kx-amber-bg);--kx-accent-ink:var(--kx-amber-ink);--kx-accent-solid:var(--kx-amber-solid);--kx-accent-line:var(--kx-amber-line);--t-bg:var(--kx-amber-bg);--t-ink:var(--kx-amber-ink);--t-solid:var(--kx-amber-solid);--t-line:var(--kx-amber-line)}
 .kx-scope *{box-sizing:border-box}
 .kx-scope [hidden]{display:none!important}
+.kx-scope .kx-sr{position:absolute;inline-size:1px;block-size:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+.kx-scope .kx-spin{animation:kx-spin 1s linear infinite}
+@keyframes kx-spin{to{transform:rotate(360deg)}}
 .kx-scope :focus-visible{outline:3px solid var(--kx-focus);outline-offset:2px}
 
 /* Tone helpers: put data-tone on any element that should take the colours. */
@@ -145,7 +148,7 @@
 .kx-tour-dots i.on{background:var(--kx-accent-solid);width:22px;border-radius:6px}
 .kx-tour-foot{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap}
 .kx-tour-foot .kx-btn-row{margin-inline-start:auto}
-@media (prefers-reduced-motion:reduce){.kx-tour-spot{transition:none}.kx-btn{transition:none}}
+@media (prefers-reduced-motion:reduce){.kx-tour-spot{transition:none}.kx-btn{transition:none}.kx-scope .kx-spin{animation:none}}
 
 @media (max-width:900px){.kx-grid.cols-3,.kx-grid.cols-4{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:640px){

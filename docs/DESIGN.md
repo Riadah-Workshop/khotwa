@@ -1,6 +1,6 @@
 # Design kit and guided tours
 
-One shared look for the parent portal, the administration console and the agents.
+One shared look for the parent portal, the administration console, the school manager dashboard and the agents.
 Code: `app/ui/` (`kx.css`, `kx.tsx`, `tour.tsx`, `tour-logic.ts`, `tours.ts`).
 
 ## Look
@@ -20,6 +20,18 @@ Code: `app/ui/` (`kx.css`, `kx.tsx`, `tour.tsx`, `tour-logic.ts`, `tours.ts`).
   English share one stylesheet. Test every new screen in both languages and at phone width (390 px).
 - Colours are checked by `scripts/test-ui-contrast.mjs` (WCAG AA). Changing a colour in `kx.css`
   that makes text hard to read fails that test.
+
+## Charts
+
+The manager dashboard draws its charts as plain HTML (no chart library), so they follow the page direction
+(Arabic reads right to left), print cleanly and every figure is printed next to its bar.
+
+- Part of a whole read at a glance: `Meter`. Ranking or comparing parts: ranked horizontal bars
+  (`RankedBars` in `school-manager-dashboard.tsx`), one colour, largest first. Change over months: columns,
+  with every month of the period drawn (a quiet month is an empty column, not a missing one).
+- Bars are thin (10 px) and columns at most 24 px wide, with the value printed at the tip.
+- The geometry and labels are in `app/manager/manager-logic.ts` and are tested by `scripts/test-manager-report.mjs`.
+- Do not colour a series by rank. Attendance keeps one colour per status (present green, late amber, absent red).
 
 ## First-login tour
 
