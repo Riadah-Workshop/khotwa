@@ -71,9 +71,9 @@ export default function AgentPresence({language}: {language: 'ar' | 'en'}) {
   const reload = useCallback(async () => {
     try {
       const response = await fetch('/api/fushati/presence?op=status', {cache: 'no-store'});
-      const body = await response.json();
+      const body = (await response.json()) as Status & {error?: string};
       if (!response.ok) throw new Error(body.error || 'error');
-      applyStatus(body as Status);
+      applyStatus(body);
     } catch (failure) {
       setMessage({tone: 'error', text: failure instanceof Error ? failure.message : 'error'});
     }

@@ -40,10 +40,10 @@ export default function PresencePanel({language}: {language: 'ar' | 'en'}) {
     const run = async () => {
       try {
         const response = await fetch(`/api/fushati/presence?op=map&days=${days}`, {cache: 'no-store'});
-        const body = await response.json();
+        const body = (await response.json()) as MapData & {error?: string};
         if (!alive) return;
         if (!response.ok) throw new Error(body.error || 'error');
-        setData(body as MapData);
+        setData(body);
         setError('');
       } catch (failure) {
         if (alive) setError(failure instanceof Error ? failure.message : 'error');
