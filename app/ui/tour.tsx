@@ -2,6 +2,7 @@
 import {useCallback, useEffect, useRef, useState} from 'react';
 import {ArrowLeft, ArrowRight, Check, CircleHelp, Eye, GraduationCap, LayoutGrid, LockKeyhole, MapPin, MessageCircle, Receipt, ScanLine, Settings, ShieldCheck, ShoppingBasket, Sparkles, TrendingUp, Users, Wallet, Warehouse, X, ChartColumn, ClipboardList, CalendarDays, Download, DoorOpen} from 'lucide-react';
 import type {ReactNode} from 'react';
+import './kx.css';
 import {Chip} from './kx';
 import {TOURS, type TourIconName, type TourPlatform, type TourStep} from './tours';
 import {clampStep, keyDirection, markTourSeen, placeCard, spotlightBox, tourSeen, tourStorageKey, type Box} from './tour-logic';
@@ -47,15 +48,17 @@ function readBox(selector: string | undefined): Box | null {
   return {top: rect.top, left: rect.left, width: rect.width, height: rect.height};
 }
 
-type TourProps = {platform: TourPlatform; open: boolean; onClose: () => void; language: 'ar' | 'en'; onSection?: (section: string) => void};
+type TourProps = {platform: TourPlatform; open: boolean; onClose: () => void; language: 'ar' | 'en'; onSection?: (section: string) => void; filter?: (step: TourStep) => boolean; accent?: 'green' | 'teal' | 'blue' | 'violet' | 'amber'};
 
 /** Mounts the tour body only while open, so each opening starts again from the first step. */
 export function GuidedTour(props: TourProps) {
   return props.open ? <TourBody {...props}/> : null;
 }
 
-function TourBody({platform, onClose, language, onSection}: TourProps) {
-  const steps: TourStep[] = TOURS[platform] || [];
+function TourBody({platform, onClose, language, onSection, filter, accent = 'green'}: TourProps) {
+  const all: TourStep[] = TOURS[platform] || [];
+  // A screen can leave out steps about things this person has no access to.
+  const steps: TourStep[] = filter ? all.filter(filter) : all;
   const [index, setIndex] = useState(0);
   const [box, setBox] = useState<Box | null>(null);
   const [view, setView] = useState({width: 1024, height: 768});
@@ -158,7 +161,7 @@ function TourBody({platform, onClose, language, onSection}: TourProps) {
   const position = narrow ? undefined : placeCard(box, cardSize, view);
   const spot = box ? spotlightBox(box, view) : null;
   const tone = step.tone || 'green';
-  return <div dir={rtl ? 'rtl' : 'ltr'} lang={language}>
+  return <div className="kx-scope kx-tour-root" data-accent={accent} dir={rtl ? 'rtl' : 'ltr'} lang={language}>
     <div className="kx-tour-backdrop" aria-hidden="true"/>
     {spot ? <div className="kx-tour-spot" style={{top: spot.top, left: spot.left, width: spot.width, height: spot.height}} aria-hidden="true"/> : <div className="kx-tour-dim" aria-hidden="true"/>}
     <div ref={cardRef} className="kx-tour-card" role="dialog" aria-modal="true" aria-labelledby="kx-tour-title" tabIndex={-1} style={position ? {top: position.top, left: position.left} : undefined} data-tone={tone}>

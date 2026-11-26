@@ -1,6 +1,6 @@
 # Design kit and guided tours
 
-One shared look for the parent portal, the administration console and the agents.
+One shared look for the parent portal, the administration console, the school manager dashboard and the agents.
 Code: `app/ui/` (`kx.css`, `kx.tsx`, `tour.tsx`, `tour-logic.ts`, `tours.ts`).
 
 ## Look
@@ -21,6 +21,18 @@ Code: `app/ui/` (`kx.css`, `kx.tsx`, `tour.tsx`, `tour-logic.ts`, `tours.ts`).
 - Colours are checked by `scripts/test-ui-contrast.mjs` (WCAG AA). Changing a colour in `kx.css`
   that makes text hard to read fails that test.
 
+## Charts
+
+The manager dashboard draws its charts as plain HTML (no chart library), so they follow the page direction
+(Arabic reads right to left), print cleanly and every figure is printed next to its bar.
+
+- Part of a whole read at a glance: `Meter`. Ranking or comparing parts: ranked horizontal bars
+  (`RankedBars` in `school-manager-dashboard.tsx`), one colour, largest first. Change over months: columns,
+  with every month of the period drawn (a quiet month is an empty column, not a missing one).
+- Bars are thin (10 px) and columns at most 24 px wide, with the value printed at the tip.
+- The geometry and labels are in `app/manager/manager-logic.ts` and are tested by `scripts/test-manager-report.mjs`.
+- Do not colour a series by rank. Attendance keeps one colour per status (present green, late amber, absent red).
+
 ## First-login tour
 
 Each platform has a short tour (6–12 steps) that opens by itself the first time a person signs in on a
@@ -36,6 +48,23 @@ browser, can be skipped, and can be replayed with the help button in the top bar
   data or using another browser shows the tour again; nothing is stored on the server.
 - `scripts/test-guided-tour.mjs` checks that every step has Arabic and English text, that every
   highlighted element exists in the files listed in `TOUR_SOURCES`, and the placement and storage logic.
+
+## Cafeteria screens (Fushati)
+
+The cafeteria administrator and agent screens (`app/fushati/`) use the same kit: a coloured top bar, a
+cafeteria selector card, icon tabs (Overview, Cafeterias, Map and attendance, Products, **Inventory**,
+Staff, Transfers, Sales and balances, **Reports**, Security), and a page heading with a one-line
+description on every tab. Administrators use the teal accent and agents the green one.
+
+- `inventory-panel.tsx` (stock cards, receive / return / waste / damage / expired / stock-count forms,
+  movement history) and `reports-panel.tsx` (report picker, date range, table, totals, CSV, print) talk to
+  `/api/fushati/inventory` and `/api/fushati/reports` (Phase 2 back end). Pure helpers are in
+  `stock-ui.ts` and `report-ui.ts` and are tested by `scripts/test-cafeteria-ui.mjs`.
+- Two tours: `cafeteria-admin` (13 steps) and `cafeteria-agent` (12 steps). Steps whose tab the person
+  cannot see (for example inventory without the inventory permission, or the backup step for anyone but the
+  system administrator) are skipped automatically.
+- Each panel is keyed by the selected cafeteria, so switching cafeteria always reloads its own data and never
+  shows another cafeteria's numbers for a moment.
 
 ## Adding a screen or a step
 

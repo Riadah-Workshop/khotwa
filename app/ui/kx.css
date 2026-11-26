@@ -29,6 +29,9 @@
 .kx-scope[data-accent=amber]{--kx-accent-bg:var(--kx-amber-bg);--kx-accent-ink:var(--kx-amber-ink);--kx-accent-solid:var(--kx-amber-solid);--kx-accent-line:var(--kx-amber-line);--t-bg:var(--kx-amber-bg);--t-ink:var(--kx-amber-ink);--t-solid:var(--kx-amber-solid);--t-line:var(--kx-amber-line)}
 .kx-scope *{box-sizing:border-box}
 .kx-scope [hidden]{display:none!important}
+.kx-scope .kx-sr{position:absolute;inline-size:1px;block-size:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+.kx-scope .kx-spin{animation:kx-spin 1s linear infinite}
+@keyframes kx-spin{to{transform:rotate(360deg)}}
 .kx-scope :focus-visible{outline:3px solid var(--kx-focus);outline-offset:2px}
 
 /* Tone helpers: put data-tone on any element that should take the colours. */
@@ -130,7 +133,8 @@
 .kx-legend{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:var(--kx-muted)}
 .kx-legend span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:3px;margin-inline-end:6px;background:var(--t-solid)}
 
-/* Guided tour */
+/* Guided tour. The tour brings its own scope so it also works on screens that are not (yet) built with the kit. */
+.kx-scope.kx-tour-root{background:transparent;min-height:0}
 .kx-tour-backdrop{position:fixed;inset:0;z-index:1000}
 .kx-tour-spot{position:fixed;z-index:1001;border-radius:14px;box-shadow:0 0 0 9999px rgba(10,26,21,.62);outline:3px solid #fff;pointer-events:none;transition:top .25s,left .25s,width .25s,height .25s}
 .kx-tour-dim{position:fixed;inset:0;z-index:1001;background:rgba(10,26,21,.62)}
@@ -144,7 +148,7 @@
 .kx-tour-dots i.on{background:var(--kx-accent-solid);width:22px;border-radius:6px}
 .kx-tour-foot{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap}
 .kx-tour-foot .kx-btn-row{margin-inline-start:auto}
-@media (prefers-reduced-motion:reduce){.kx-tour-spot{transition:none}.kx-btn{transition:none}}
+@media (prefers-reduced-motion:reduce){.kx-tour-spot{transition:none}.kx-btn{transition:none}.kx-scope .kx-spin{animation:none}}
 
 @media (max-width:900px){.kx-grid.cols-3,.kx-grid.cols-4{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:640px){
@@ -158,4 +162,4 @@
  .kx-tabs{gap:4px;padding:4px}
  .kx-tab{flex:1 0 auto;min-width:74px;flex-direction:column;gap:3px;padding:7px 6px;font-size:12px;line-height:1.2;white-space:normal;text-align:center;min-height:56px}
 }
-@media print{.kx-topbar,.kx-tabs,.kx-no-print{display:none!important}.kx-scope{background:#fff}.kx-card{box-shadow:none}}
+@media print{.kx-topbar,.kx-tabs,.kx-no-print,.kx-tour-root{display:none!important}.kx-scope{background:#fff}.kx-card{box-shadow:none}}
