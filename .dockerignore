@@ -1,0 +1,27 @@
+# The Dockerfile runs `COPY . .` after installing dependencies. Anything listed here
+# stays out of the build context, so a local folder can never overwrite the
+# installed dependencies or bake local state or secrets into an image.
+.git
+.github
+node_modules
+**/node_modules
+.pnpm-store
+.next
+.vinext
+dist
+coverage
+.wrangler
+data
+
+# Secrets and local configuration
+.env
+.env.*
+*.pem
+*.key
+
+# Noise
+*.log
+*.zip
+*.tsbuildinfo
+.DS_Store
+Thumbs.db

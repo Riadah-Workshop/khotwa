@@ -2,9 +2,10 @@ import handler from "vinext/server/fetch-handler";
 import { handleKhotwaAuthentication } from "../lib/standalone-auth";
 import {runWithSchool} from "../lib/school-tenancy";
 import { runWithConnectorBinding } from "../lib/connector-context";
+import { withSecurityHeaders } from "../lib/security-headers";
 import type { ConnectorBinding } from "../lib/connector-contract.mjs";
 
-export default {
+const routes = {
   async fetch(request: Request, env: Cloudflare.Env, ctx: ExecutionContext<{ CONNECTORS?: ConnectorBinding }>) {
     // The public version endpoint is not a DB readiness signal. Coolify uses
     // /readyz to avoid marking a container healthy before the schema exists.
@@ -43,5 +44,13 @@ export default {
     return result.school
       ? runWithSchool(result.school, () => runWithConnectorBinding(binding, () => handler.fetch(request, env, ctx)))
       : runWithConnectorBinding(binding, () => handler.fetch(request, env, ctx));
+  },
+};
+
+export default {
+  // Single exit point: login pages, redirects, API responses, static assets and
+  // /readyz all leave the Worker through withSecurityHeaders().
+  async fetch(request: Request, env: Cloudflare.Env, ctx: ExecutionContext<{ CONNECTORS?: ConnectorBinding }>) {
+    return withSecurityHeaders(await routes.fetch(request, env, ctx));
   },
 };

@@ -18,7 +18,8 @@ RUN node --experimental-strip-types scripts/test-khotwa-auth.mjs \
     && node --experimental-strip-types scripts/test-multischool-auth.mjs \
     && node --experimental-strip-types scripts/test-deputy-invitations.mjs \
     && node --experimental-strip-types scripts/test-hostinger-smtp.mjs \
-    && node --experimental-strip-types scripts/test-node-smtp-relay.mjs
+    && node --experimental-strip-types scripts/test-node-smtp-relay.mjs \
+    && node --experimental-strip-types scripts/test-security-headers.mjs
 RUN corepack pnpm build && node scripts/prepare-vps-config.mjs
 
 FROM node:22-bookworm-slim AS runtime
