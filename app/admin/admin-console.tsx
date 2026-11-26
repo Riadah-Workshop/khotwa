@@ -355,6 +355,6 @@ export default function AdminConsole({activeSchoolId, tourKey}: {activeSchoolId:
         <Notice tone="slate" icon={<CircleHelp size={18}/>}>{t('الأدوار: مدير النظام / وكيل شؤون الطلاب / مدير المدرسة / ولي الأمر / مدير فسحتي / موظف المقصف', 'Six roles: System Admin / Student Affairs Agent / School Manager / Parent / Fushati Admin / Cafeteria Agent')}</Notice>
       </TabPanel>
     </main>
-    <GuidedTour platform="admin" open={tour.open} onClose={tour.close} language={lang} onSection={openSection}/>
+    <GuidedTour platform="admin" accent="violet" open={tour.open} onClose={tour.close} language={lang} onSection={openSection}/>
   </div>;
 }

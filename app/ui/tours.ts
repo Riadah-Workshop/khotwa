@@ -83,10 +83,37 @@ export const TOURS: Partial<Record<TourPlatform, TourStep[]>> = {
       title: {ar: 'اللغة والتقارير والمساعدة', en: 'Language, reports and help'},
       body: {ar: 'بدّل اللغة، وافتح تقارير مدير المدرسة، وحدّث الصفحة. زر الجولة يعيد هذا الشرح متى شئت.', en: 'Switch language, open the manager reports and refresh the page. The tour button plays this guide again whenever you like.'}},
   ],
+  agent: [
+    {id: 'welcome', section: 'page:services', icon: 'welcome', tone: 'green',
+      title: {ar: 'أهلاً بك في خطوة', en: 'Welcome to Khotwa'},
+      body: {ar: 'خطوة تجمع أعمال الوكيل المدرسي في مكان واحد: الطلاب والحضور والحالات والتواصل والتقارير. هذه جولة قصيرة تعرّفك على الصفحة، ويمكنك تخطيها وإعادتها متى شئت.', en: "Khotwa brings the Student Affairs Agent's work together: students, attendance, cases, communication and reports. This short tour shows you around; you can skip it and replay it whenever you like."}},
+    {id: 'groups', target: '[data-tour="agent-groups"]', section: 'page:services', icon: 'dashboard', tone: 'blue',
+      title: {ar: 'أقسام العمل', en: 'Your work areas'},
+      body: {ar: 'القائمة الرئيسية (جانبية على الحاسوب، وسفلية على الجوال) تجمع العمل في أقسام: الرئيسية والطلاب والحضور والحالات والتواصل والرحلات والتقارير. الرقم الملوّن يعني أن هناك ما ينتظر متابعتك، وعلى الجوال يفتح زر «الأقسام» بقية الأقسام.', en: 'The main menu (a side menu on a computer, a bottom bar on a phone) groups the work into areas: Home, Students, Attendance, Cases, Communication, Trips and Reports. A coloured number means something is waiting for you, and on a phone the "Sections" button opens the rest.'}},
+    {id: 'search', target: '[data-tour="agent-search"]', section: 'page:services', icon: 'students', tone: 'teal',
+      title: {ar: 'ابحث عن أي خدمة', en: 'Find any service'},
+      body: {ar: 'اكتب «غياب» أو «استئذان» أو «تقارير» وسترى الخدمة المناسبة مباشرة، دون أن تحفظ مكان كل صفحة.', en: 'Type "absence", "permission" or "reports" and the right service appears, so you do not have to remember where each page is.'}},
+    {id: 'favorites', target: '[data-tour="agent-favorites"]', section: 'page:services', icon: 'dashboard', tone: 'amber',
+      title: {ar: 'خدماتي المفضلة', en: 'My favourite services'},
+      body: {ar: 'ثبّت حتى أربع خدمات تستخدمها كل يوم لتصل إليها بضغطة واحدة. اضغط «تخصيص» لاختيارها.', en: 'Pin up to four services you use every day to reach them in one tap. Press "Customize" to choose them.'}},
+    {id: 'categories', target: '[data-tour="agent-categories"]', section: 'page:services', icon: 'cases', tone: 'violet',
+      title: {ar: 'أقسام خطوة', en: 'Khotwa areas'},
+      body: {ar: 'كل قسم بلون وأيقونة خاصة به. اضغط على أي منها لتفتح صفحاته.', en: 'Each area has its own colour and icon. Tap one to open its pages.'}},
+    {id: 'subnav', target: '[data-tour="agent-subnav"]', section: 'page:attendance', icon: 'attendance', tone: 'green',
+      title: {ar: 'صفحات القسم', en: 'Pages of an area'},
+      body: {ar: 'داخل كل قسم تظهر صفحاته هنا مع وصف مختصر لها، وبجانبها اختصارات لأكثر الإجراءات استخداماً مثل تسجيل تأخر أو استئذان.', en: 'Inside an area its pages appear here with a short description, next to shortcuts for the most common actions such as recording a late arrival or a permission.'}},
+    {id: 'new-case', target: '[data-tour="agent-new-case"]', section: 'page:attendance', icon: 'cases', tone: 'red',
+      title: {ar: 'تسجيل حالة', en: 'Record a case'},
+      body: {ar: 'من هذا الزر تسجّل أي حالة لطالب في أي صفحة: تأخر، استئذان، مخالفة، سلوك إيجابي أو تواصل مع ولي الأمر.', en: 'Use this button on any page to record a case for a student: a late arrival, a permission, a violation, positive behaviour or contact with a parent.'}},
+    {id: 'tools', target: '[data-tour="agent-tools"]', section: 'page:services', icon: 'settings', tone: 'slate',
+      title: {ar: 'اللغة والإعدادات والمساعدة', en: 'Language, settings and help'},
+      body: {ar: 'من الأعلى تبدّل اللغة، وتفتح الإعدادات والنسخ الاحتياطي، وتحدّث البيانات. زر علامة الاستفهام يعيد هذه الجولة متى شئت.', en: 'At the top you switch language, open settings and backup, and refresh the data. The question-mark button replays this tour whenever you like.'}},
+  ],
 };
 
 /** Source files that contain the data-tour markers of each platform. */
 export const TOUR_SOURCES: Partial<Record<TourPlatform, string[]>> = {
   parent: ['app/parent/parent-portal.tsx', 'app/parent/fushati-parent.tsx'],
   admin: ['app/admin/admin-console.tsx'],
+  agent: ['app/dashboard.tsx', 'app/services-hub.tsx'],
 };
