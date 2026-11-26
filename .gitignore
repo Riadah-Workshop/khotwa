@@ -1,0 +1,27 @@
+# Dependencies and build output
+node_modules/
+.pnpm-store/
+.next/
+.vinext/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Local runtime state (Miniflare/Wrangler D1 + R2 files hold real student data)
+.wrangler/
+/data/
+
+# Secrets and local configuration: never commit these
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Logs, OS and editor files
+*.log
+.DS_Store
+Thumbs.db
+
+# Release archives belong in GitHub Releases, not in the repository
+*.zip
