@@ -56,6 +56,9 @@ POLICY['/api/parent/password'] = ['parent'];
 POLICY['/api/fushati'] = ['admin', 'adminInSchool', 'manager', 'parent', 'fushatiAdmin', 'fushatiAgent']; // managers: GET only
 POLICY['/api/fushati/receipts'] = ['admin', 'adminInSchool', 'parent', 'fushatiAdmin', 'fushatiAgent'];
 POLICY['/api/fushati/presence'] = ['admin', 'adminInSchool', 'parent', 'fushatiAdmin', 'fushatiAgent']; // parents pass the gateway and are refused by the route (checked in test-cafeteria-presence.mjs)
+POLICY['/api/fushati/inventory'] = ['admin', 'adminInSchool', 'parent', 'fushatiAdmin', 'fushatiAgent']; // parents pass the gateway and are refused by the route (checked in test-cafeteria-inventory.mjs)
+POLICY['/api/fushati/reports'] = ['admin', 'adminInSchool', 'parent', 'fushatiAdmin', 'fushatiAgent']; // parents pass the gateway and are refused by the route (checked in test-cafeteria-reports.mjs)
+POLICY['/api/fushati/backup'] = ['admin', 'adminInSchool', 'parent', 'fushatiAdmin', 'fushatiAgent']; // only the system administrator is served; the route refuses everyone else (checked in test-cafeteria-reports.mjs)
 POLICY['/api/webhooks/resend'] = EVERYONE; // public: the gateway skips the session check, the route verifies the sender's signature
 const PUBLIC_ROUTES = new Set(['/api/webhooks/resend']); // no session, so no role rule (not even the manager's read-only rule) applies
 // -----------------------------------------------------------------------------------------------------
