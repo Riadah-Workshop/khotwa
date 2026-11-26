@@ -181,6 +181,19 @@ export async function createHarness() {
   for (const school of SCHOOLS.filter((entry) => entry.id !== 'default')) sessions.admin[school.key] = (await gateway.adminSwitchCookie(SESSION_SECRET, ADMIN_EMAIL, school.id)).split(';')[0];
   for (const [who, phone] of Object.entries(phones)) sessions.parent[who] = await login('/parent-login', {phone, password: PASSWORD});
 
+  // Cafeteria (Fushati) accounts: an administrator and an agent identified by mobile number.
+  const addFushati = (id, email, role, identifier) => DB.prepare('INSERT INTO fushati_users(id,email,full_name,role,password_hash,active,must_change_password,session_version,created_at,login_identifier,activated_at) VALUES(?,?,?,?,?,1,0,1,?,?,?)').bind(id, email, `Account ${id}`, role, passwordHash, now, identifier, now).run();
+  await addFushati('fushati-admin-1', 'fushati-admin@example.com', 'fushati_admin', '');
+  await addFushati('fushati-agent-1', 'fushati-agent@example.com', 'fushati_agent', 'phone:+966512345678');
+  sessions.fushatiAdmin = await login('/fushati-admin-login', {email: 'fushati-admin@example.com', password: PASSWORD});
+  sessions.fushatiAgent = await login('/fushati-agent-login', {identifier: '0512345678', password: PASSWORD});
+
+  /** Only the gateway: does this request get through, and if not, how is it refused? */
+  async function gate(cookie, pathname, {method = 'GET', headers = {}} = {}) {
+    const auth = await gateway.handleKhotwaAuthentication(new Request(ORIGIN + pathname, {method, headers: {cookie: cookie || '', origin: ORIGIN, ...headers}}), env);
+    return auth.response ? {allowed: false, status: auth.response.status, location: auth.response.headers.get('location')} : {allowed: true, status: null, location: null};
+  }
+
   /** One request through the whole path. Returns the Response (the gateway's own, if it refuses). */
   async function serve(cookie, pathname, {method = 'GET', body, headers = {}} = {}) {
     const init = {method, headers: {cookie: cookie || '', origin: ORIGIN, ...headers}};
@@ -199,7 +212,7 @@ export async function createHarness() {
   }
 
   return {
-    DB, env, tenancy, schools: SCHOOLS, schoolByKey, sessions, seeded, sharedChildren, phones, serve, tables,
+    DB, env, tenancy, schools: SCHOOLS, schoolByKey, sessions, seeded, sharedChildren, phones, serve, gate, tables,
     async close() { await mf.dispose(); },
   };
 }
