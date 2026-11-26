@@ -23,16 +23,17 @@ export const tourHelpLabel = (language: 'ar' | 'en') => LABELS[language].help;
  * browser) once `ready` is true, and can be replayed with start().
  */
 export function useTour(platform: TourPlatform, accountKey?: string, ready = true) {
-  const [open, setOpen] = useState(false);
+  const [forced, setForced] = useState(false);
+  const [closed, setClosed] = useState(false);
   const key = tourStorageKey(platform, accountKey);
-  useEffect(() => {
-    if (!ready || typeof window === 'undefined') return;
-    if (!tourSeen(window.localStorage, key)) setOpen(true);
-  }, [ready, key]);
-  const start = useCallback(() => setOpen(true), []);
+  // Not ready (or on the server) the storage is not read, so the first render matches the server's.
+  const firstTime = ready && !closed && typeof window !== 'undefined' && !tourSeen(window.localStorage, key);
+  const open = forced || firstTime;
+  const start = useCallback(() => { setClosed(false); setForced(true); }, []);
   const close = useCallback(() => {
     markTourSeen(window.localStorage, key);
-    setOpen(false);
+    setForced(false);
+    setClosed(true);
   }, [key]);
   return {open, start, close};
 }
@@ -46,7 +47,14 @@ function readBox(selector: string | undefined): Box | null {
   return {top: rect.top, left: rect.left, width: rect.width, height: rect.height};
 }
 
-export function GuidedTour({platform, open, onClose, language, onSection}: {platform: TourPlatform; open: boolean; onClose: () => void; language: 'ar' | 'en'; onSection?: (section: string) => void}) {
+type TourProps = {platform: TourPlatform; open: boolean; onClose: () => void; language: 'ar' | 'en'; onSection?: (section: string) => void};
+
+/** Mounts the tour body only while open, so each opening starts again from the first step. */
+export function GuidedTour(props: TourProps) {
+  return props.open ? <TourBody {...props}/> : null;
+}
+
+function TourBody({platform, onClose, language, onSection}: TourProps) {
   const steps: TourStep[] = TOURS[platform] || [];
   const [index, setIndex] = useState(0);
   const [box, setBox] = useState<Box | null>(null);
@@ -54,23 +62,20 @@ export function GuidedTour({platform, open, onClose, language, onSection}: {plat
   const [cardSize, setCardSize] = useState({width: 380, height: 220});
   const cardRef = useRef<HTMLDivElement>(null);
   const sectionRef = useRef(onSection);
-  sectionRef.current = onSection;
-  const returnFocus = useRef<HTMLElement | null>(null);
+  useEffect(() => { sectionRef.current = onSection; });
   const labels = LABELS[language];
   const rtl = language === 'ar';
   const step = steps[clampStep(index, steps.length)];
   const last = index >= steps.length - 1;
 
   useEffect(() => {
-    if (!open) return;
-    setIndex(0);
-    returnFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    return () => { returnFocus.current?.focus?.(); };
-  }, [open]);
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    return () => { opener?.focus?.(); };
+  }, []);
 
   // Open the right tab, bring the target into view, then follow it while the page moves.
   useEffect(() => {
-    if (!open || !step) return;
+    if (!step) return;
     if (step.section) sectionRef.current?.(step.section);
     let cancelled = false;
     let tries = 0;
@@ -89,11 +94,19 @@ export function GuidedTour({platform, open, onClose, language, onSection}: {plat
           const wanted = rect.height >= free - 16 ? 16 : Math.max(16, (free - rect.height) / 2);
           if (Math.abs(rect.top - wanted) > 4) window.scrollBy({top: rect.top - wanted});
         } else if (!desktopScrolled) {
-          found.scrollIntoView({block: 'center', inline: 'nearest'});
+          // A tall section is shown from its top; a small one is centred.
+          if (rect.height > window.innerHeight * 0.55) window.scrollBy({top: rect.top - 96});
+          else found.scrollIntoView({block: 'center', inline: 'nearest'});
           desktopScrolled = true;
         }
       }
-      setBox(readBox(step.target));
+      let next = readBox(step.target);
+      if (next) {
+        // Highlight only as much of a very tall section as fits next to the card, so the card never covers it.
+        const cap = window.innerWidth <= 640 ? window.innerHeight - (cardRef.current?.offsetHeight || 230) - 56 : window.innerHeight * 0.42;
+        if (next.height > cap) next = {...next, height: Math.max(60, Math.round(cap))};
+      }
+      setBox(next);
       if (cardRef.current) setCardSize({width: cardRef.current.offsetWidth, height: cardRef.current.offsetHeight});
     };
     // The target may appear a moment after a tab switch, so look a few times.
@@ -103,30 +116,31 @@ export function GuidedTour({platform, open, onClose, language, onSection}: {plat
     window.addEventListener('resize', follow);
     window.addEventListener('scroll', follow, true);
     return () => { cancelled = true; window.clearInterval(retry); window.removeEventListener('resize', follow); window.removeEventListener('scroll', follow, true); };
-  }, [open, step]);
+  }, [step]);
 
   // On phones the card covers the bottom of the screen; extra room at the end of the page lets the last sections scroll above it.
   useEffect(() => {
-    if (!open || window.innerWidth > 640) return;
+    if (window.innerWidth > 640) return;
     const previous = document.body.style.paddingBottom;
     document.body.style.paddingBottom = '280px';
     return () => { document.body.style.paddingBottom = previous; };
-  }, [open]);
+  }, []);
 
-  useEffect(() => { if (open) cardRef.current?.focus(); }, [open, index]);
+  useEffect(() => { cardRef.current?.focus(); }, [index]);
 
-  const go = useCallback((direction: 'next' | 'prev') => {
+  function go(direction: 'next' | 'prev') {
     if (direction === 'next') {
       if (last) onClose(); else setIndex(i => clampStep(i + 1, steps.length));
     } else setIndex(i => clampStep(i - 1, steps.length));
-  }, [last, onClose, steps.length]);
+  }
+  const goRef = useRef(go);
+  useEffect(() => { goRef.current = go; });
 
   useEffect(() => {
-    if (!open) return;
     function onKey(event: KeyboardEvent) {
       if (event.key === 'Escape') { event.preventDefault(); onClose(); return; }
       const direction = keyDirection(event.key, rtl);
-      if (direction) { event.preventDefault(); go(direction); return; }
+      if (direction) { event.preventDefault(); goRef.current(direction); return; }
       if (event.key === 'Tab' && cardRef.current) {
         const focusable = Array.from(cardRef.current.querySelectorAll<HTMLElement>('button:not(:disabled)'));
         if (!focusable.length) return;
@@ -137,9 +151,9 @@ export function GuidedTour({platform, open, onClose, language, onSection}: {plat
     }
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [open, rtl, go, onClose]);
+  }, [rtl, onClose]);
 
-  if (!open || !step) return null;
+  if (!step) return null;
   const narrow = view.width <= 640;
   const position = narrow ? undefined : placeCard(box, cardSize, view);
   const spot = box ? spotlightBox(box, view) : null;
