@@ -37,6 +37,8 @@ export const SCHOOLS = [
 ];
 export const SHARED_PARENT_PHONE = '0599999999';
 export const schoolByKey = Object.fromEntries(SCHOOLS.map((school) => [school.key, school]));
+/** A valid, distinct UUID per school and kind (1 = student, 2 = cafeteria, 3 = menu item, 4 = transfer). Some routes only accept UUID ids. */
+export const uuid = (school, kind) => `${school.digits.slice(-2).repeat(4)}-0000-4000-8000-${String(kind).padStart(12, '0')}`;
 
 const MIGRATIONS = fs.readdirSync('drizzle').filter((name) => name.endsWith('.sql')).sort();
 const migrationStatements = MIGRATIONS.flatMap((file) => fs.readFileSync(path.join('drizzle', file), 'utf8').split('--> statement-breakpoint').filter((statement) => statement.trim()));
@@ -114,6 +116,7 @@ export async function createHarness() {
       const fk = facts[table].foreignKeys.find((entry) => entry.from === name);
       if (name in overrides) row[name] = overrides[name];
       else if (fk) row[name] = rows[fk.table][fk.to];
+      else if (table === 'students' && name === 'id') row[name] = uuid(school, 1);
       else if (name === 'student_ids') row[name] = JSON.stringify([rows.students.id]);
       else if (['extra', 'snapshot', 'data', 'payload'].includes(name)) row[name] = JSON.stringify({marker: school.marker});
       else if (name === 'deleted_at') row[name] = '';

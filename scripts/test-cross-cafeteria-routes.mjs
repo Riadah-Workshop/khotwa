@@ -13,7 +13,7 @@
 // Three schools each have one cafeteria with a marked menu item, account, purchase
 // and bank transfer. The agent is assigned to school a's cafeteria only.
 import assert from 'node:assert/strict';
-import {assertOnlySchool, createHarness} from './support/school-harness.mjs';
+import {assertOnlySchool, createHarness, uuid} from './support/school-harness.mjs';
 
 const harness = await createHarness();
 try {
@@ -21,27 +21,23 @@ try {
   const legacy = schoolByKey.default, a = schoolByKey.a, b = schoolByKey.b;
   const now = '2026-11-02T08:00:00.000Z';
 
-  const cafe = {}, menu = {}, student = {};
+  const cafe = {}, menu = {}, transfer = {}, student = {};
   for (const school of [legacy, a, b]) {
     const key = school.key;
-    cafe[key] = `cafe-${key}`;
-    menu[key] = `menu-${key}`;
+    cafe[key] = uuid(school, 2);
+    menu[key] = uuid(school, 3);
+    transfer[key] = uuid(school, 4);
     student[key] = seeded[school.id].students.id;
+    assert.equal(student[key], uuid(school, 1), 'the seeded student has a UUID id');
     await DB.prepare('INSERT INTO fushati_cafeterias(id,school_id,name,active,created_at) VALUES(?,?,?,1,?)').bind(cafe[key], school.id, `${school.marker}:cafeteria`, now).run();
     await DB.prepare('INSERT INTO fushati_menu_items(id,cafeteria_id,name,category,price_minor,active,available,created_by,created_at) VALUES(?,?,?,?,?,1,1,?,?)').bind(menu[key], cafe[key], `${school.marker}:menu`, 'general', 300, 'seed', now).run();
     await DB.prepare('INSERT INTO fushati_accounts(id,school_id,cafeteria_id,student_id,balance_minor,created_at) VALUES(?,?,?,?,?,?)').bind(`acct-${key}`, school.id, cafe[key], student[key], 5000, now).run();
     await DB.prepare('INSERT INTO fushati_purchases(id,account_id,cafeteria_id,agent_id,items_json,total_minor,day_key,month_key,posted,created_at) VALUES(?,?,?,?,?,?,?,?,1,?)').bind(`purchase-${key}`, `acct-${key}`, cafe[key], 'seed', JSON.stringify([{name: `${school.marker}:purchase`}]), 500, '2026-11-02', '2026-11', now).run();
-    await DB.prepare('INSERT INTO fushati_transfers(id,account_id,cafeteria_id,parent_phone,amount_minor,bank_reference,destination_iban,receipt_key,receipt_mime,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)').bind(`transfer-${key}`, `acct-${key}`, cafe[key], `05${school.digits}`, 1000, `${school.marker}-ref`, `SA-${school.marker}`, 'receipt', 'image/png', now).run();
+    await DB.prepare('INSERT INTO fushati_transfers(id,account_id,cafeteria_id,parent_phone,amount_minor,bank_reference,destination_iban,receipt_key,receipt_mime,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)').bind(transfer[key], `acct-${key}`, cafe[key], `05${school.digits}`, 1000, `${school.marker}-ref`, `SA-${school.marker}`, 'receipt', 'image/png', now).run();
   }
   await DB.prepare('INSERT INTO fushati_assignments(user_id,cafeteria_id) VALUES(?,?)').bind('fushati-agent-1', cafe.a).run();
 
-  // The parent of each school's child must really be allowed to see that child (the grant lists the student ids).
-  for (const school of [a, b]) {
-    const row = seeded[school.id].students;
-    assert.equal(row.phone, `05${school.digits}`, 'the seeded child belongs to the parent of its school');
-    const result = await DB.prepare(`UPDATE "tenant_${school.id}_parent_grants" SET student_ids=? WHERE phone=?`).bind(JSON.stringify([row.id]), `05${school.digits}`).run();
-    assert.equal(result.meta.changes, 1, `school ${school.key} has one grant for its parent`);
-  }
+  for (const school of [a, b]) assert.equal(seeded[school.id].students.phone, `05${school.digits}`, 'the seeded child belongs to the parent of its school');
 
   const get = async (cookie, query) => { const response = await serve(cookie, `/api/fushati?${query}`); return {status: response.status, text: await response.text()}; };
   const post = async (cookie, op, data) => { const response = await serve(cookie, '/api/fushati', {method: 'POST', body: {op, data}}); return {status: response.status, text: await response.text()}; };
@@ -65,11 +61,11 @@ try {
     assert.equal((await get(agent, `op=export&cafeteriaId=${target}`)).status, 403, `agent export ${target}`);
   }
   const beforeName = await DB.prepare('SELECT name FROM fushati_menu_items WHERE id=?').bind(menu.b).first();
-  assert.equal((await post(agent, 'edit-menu', {id: menu.b, name: 'hijacked', category: 'x', price: '1', active: 1, available: 1})).status, 403, 'agent cannot edit another cafeteria\'s menu');
+  assert.equal((await post(agent, 'edit-menu', {id: menu.b, name: 'hijacked', category: 'x', price: '1', active: true, available: true})).status, 403, 'agent cannot edit another cafeteria\'s menu');
   assert.equal((await post(agent, 'delete-menu', {id: menu.b})).status, 403, 'agent cannot delete another cafeteria\'s menu');
-  assert.equal((await post(agent, 'review-transfer', {id: 'transfer-b', status: 'approved'})).status, 403, 'agent cannot approve another cafeteria\'s transfer');
+  assert.equal((await post(agent, 'review-transfer', {id: transfer.b, status: 'approved'})).status, 403, 'agent cannot approve another cafeteria\'s transfer');
   assert.deepEqual(await DB.prepare('SELECT name FROM fushati_menu_items WHERE id=?').bind(menu.b).first(), beforeName, 'the other cafeteria\'s menu item is unchanged');
-  assert.equal(await count("SELECT COUNT(*) AS n FROM fushati_transfers WHERE id='transfer-b' AND status='pending'"), 1, 'the other cafeteria\'s transfer is still pending');
+  assert.equal(await count("SELECT COUNT(*) AS n FROM fushati_transfers WHERE id=? AND status='pending'", transfer.b), 1, 'the other cafeteria\'s transfer is still pending');
   // The one write an agent has (propose a menu item) works for their cafeteria and only theirs.
   assert.equal((await post(agent, 'create-menu', {cafeteriaId: cafe.b, name: 'intruder', category: 'x'})).status, 403, 'agent cannot add to another cafeteria');
   assert.equal(await count('SELECT COUNT(*) AS n FROM fushati_menu_items WHERE cafeteria_id=?', cafe.b), 1, 'nothing was added to the other cafeteria');
