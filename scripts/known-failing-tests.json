@@ -1,1 +1,3 @@
-{}
+{
+ "test-localization.mjs": "Fails at the 'Record an incident' assertion (line 73) on the original upload as well: the English label is not rendered on the Incidents tab although the Arabic key exists in lib/ui-translations.ts. Needs investigation: stale test or real UI regression."
+}

@@ -58,8 +58,10 @@ jobs:
           cache: pnpm
       - name: Install dependencies
         run: corepack pnpm install --frozen-lockfile
-      - name: Typecheck
-        run: corepack pnpm typecheck
+      # The code base has existing type errors; this fails only when a file gets
+      # MORE errors than scripts/ratchet-baseline.json allows. See docs/TESTING.md.
+      - name: Typecheck (no new errors)
+        run: corepack pnpm ratchet typecheck
 
   lint:
     name: Lint
@@ -77,8 +79,9 @@ jobs:
           cache: pnpm
       - name: Install dependencies
         run: corepack pnpm install --frozen-lockfile
-      - name: Lint
-        run: corepack pnpm lint
+      # Same ratchet as typecheck: existing lint errors are tolerated, new ones are not.
+      - name: Lint (no new errors)
+        run: corepack pnpm ratchet lint
 
   # Builds the same image Coolify builds (this also runs the Dockerfile's own
   # fast test gate and the production build), starts it, and checks it answers.

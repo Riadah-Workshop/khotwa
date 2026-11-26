@@ -13,6 +13,7 @@
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "node scripts/run-tests.mjs",
+    "ratchet": "node scripts/ratchet.mjs",
     "db:generate": "drizzle-kit generate"
   },
   "dependencies": {
