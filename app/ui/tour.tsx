@@ -48,15 +48,17 @@ function readBox(selector: string | undefined): Box | null {
   return {top: rect.top, left: rect.left, width: rect.width, height: rect.height};
 }
 
-type TourProps = {platform: TourPlatform; open: boolean; onClose: () => void; language: 'ar' | 'en'; onSection?: (section: string) => void; accent?: 'green' | 'teal' | 'blue' | 'violet' | 'amber'};
+type TourProps = {platform: TourPlatform; open: boolean; onClose: () => void; language: 'ar' | 'en'; onSection?: (section: string) => void; filter?: (step: TourStep) => boolean; accent?: 'green' | 'teal' | 'blue' | 'violet' | 'amber'};
 
 /** Mounts the tour body only while open, so each opening starts again from the first step. */
 export function GuidedTour(props: TourProps) {
   return props.open ? <TourBody {...props}/> : null;
 }
 
-function TourBody({platform, onClose, language, onSection, accent = 'green'}: TourProps) {
-  const steps: TourStep[] = TOURS[platform] || [];
+function TourBody({platform, onClose, language, onSection, filter, accent = 'green'}: TourProps) {
+  const all: TourStep[] = TOURS[platform] || [];
+  // A screen can leave out steps about things this person has no access to.
+  const steps: TourStep[] = filter ? all.filter(filter) : all;
   const [index, setIndex] = useState(0);
   const [box, setBox] = useState<Box | null>(null);
   const [view, setView] = useState({width: 1024, height: 768});

@@ -114,4 +114,5 @@ for (const platform of Object.keys(tours.TOURS)) {
   }
 }
 assert.ok(steps >= 6, 'at least the parent tour must exist');
+for (const platform of tours.TOUR_PLATFORMS) assert.ok(tours.TOURS[platform] && tours.TOURS[platform].length >= 3, `${platform} has no tour: every platform must teach its first-time user`);
 console.log(`ok: tour logic and ${steps} steps in ${Object.keys(tours.TOURS).length} tour(s)`);

@@ -1,2 +1,80 @@
-.fs-root{font-family:system-ui,Tahoma,sans-serif;color:#17352f;background:#f3f7f5;min-height:100vh;padding:20px}.fs-root *{box-sizing:border-box}.fs-shell{max-width:1250px;margin:auto}.fs-header{display:flex;justify-content:space-between;align-items:center;gap:14px;background:#fff;border:1px solid #dae6df;border-radius:18px;padding:18px 24px;margin-bottom:18px}.fs-brand{display:flex;gap:14px;align-items:center}.fs-brand strong{display:block;font-size:25px;color:#175743}.fs-brand strong small{font-size:13px;color:#719188}.fs-brand em{display:block;font-size:13px;font-style:normal;color:#667e74}.fs-icon{padding:11px;color:#fff;background:#175743;border-radius:14px}.fs-head-actions,.fs-buttons{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.fs-root button,.fs-root a.fs-primary-link{border:1px solid #abcbbd;background:#fff;color:#1b5c49;padding:9px 13px;border-radius:9px;font-weight:650;font-family:inherit;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px}.fs-root button:disabled{opacity:.5;cursor:not-allowed}.fs-root button:hover:not(:disabled){background:#e5f1eb}.fs-root button[type=submit],.fs-root .fs-primary-link,.fs-root .fs-checkout button,.fs-root .fs-fields>button:not([type=button]){background:#176849;color:#fff;border-color:#176849}.fs-root .fs-danger{border-color:#edc6c6;color:#a32932}.fs-toolbar{background:#fff;border:1px solid #dae6df;border-radius:18px;padding:15px;margin-bottom:18px}.fs-toolbar>label{display:flex;align-items:center;gap:9px;font-weight:700}.fs-root input,.fs-root select{padding:10px;border-radius:9px;border:1px solid #c5d7ce;background:#fff;color:#183930;min-width:0;max-width:100%;font:inherit}.fs-toolbar select{min-width:min(330px,70vw)}.fs-toolbar nav{display:flex;flex-wrap:wrap;gap:7px;margin-top:12px}.fs-toolbar nav button{background:#f6f9f7}.fs-toolbar nav button.fs-tab-selected{background:#176849;color:#fff}.fs-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}.fs-stat,.fs-card{background:#fff;border:1px solid #dce9e2;border-radius:16px;padding:19px;margin-bottom:16px;box-shadow:0 5px 20px #16493409}.fs-stat{display:flex;flex-direction:column;gap:10px;color:#64796e}.fs-stat strong{font-size:25px;color:#165c44}.fs-stat small{font-size:11px}.fs-stat>svg{color:#2c8968}.fs-span{grid-column:1/-1}.fs-card h2{display:flex;align-items:center;gap:9px;font-size:19px;color:#154c3c;margin:0 0 16px}.fs-card p{color:#64766e}.fs-fields{display:flex;gap:13px;flex-wrap:wrap;align-items:end;margin:12px 0}.fs-fields label{display:flex;flex:1 1 190px;flex-direction:column;gap:7px;font-weight:650;font-size:13px}.fs-fields label input,.fs-fields label select{width:100%}.fs-table{overflow-x:auto}.fs-table table{width:100%;border-collapse:collapse;min-width:620px;text-align:right}.fs-table td,.fs-table th{border-bottom:1px solid #e6eeea;padding:12px 8px;vertical-align:middle}.fs-table th{font-size:13px;color:#547467;background:#f7faf8}.fs-table td small{display:block;color:#7f9089;font-size:12px}.fs-table button{margin:3px;font-size:12px}.fs-table a{color:#197657}.fs-products{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}.fs-products label{border:1px solid #dbe9e1;border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:8px}.fs-products small{color:#678476}.fs-products input{width:100%}.fs-checkout{border-top:1px solid #dbe9e1;margin-top:20px;padding-top:14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;font-size:20px}.fs-video{width:min(500px,100%);margin-top:12px;border-radius:10px}.fs-error,.fs-notice,.fs-credential{border-radius:10px;padding:13px 16px;background:#fff3f2;color:#9e2b2b;margin-bottom:16px}.fs-notice{background:#e8f6ed;color:#12613d}.fs-credential{background:#fff8df;color:#645015;display:flex;gap:10px;align-items:center;flex-wrap:wrap}.fs-credential code{font-size:15px;user-select:all}.fs-footer{text-align:center;color:#7d9688;font-size:13px;margin-top:30px}@media(max-width:900px){.fs-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:580px){.fs-root{padding:10px}.fs-header{align-items:flex-start;flex-direction:column}.fs-grid{grid-template-columns:1fr}.fs-toolbar>label{flex-wrap:wrap}.fs-fields{display:block}.fs-fields label{margin:12px 0}.fs-fields button{margin:4px}.fs-stat{margin-bottom:0}}
-@media print{.fs-header,.fs-toolbar,.fs-root button,.fs-footer,.fs-fields{display:none!important}.fs-root{padding:0;background:#fff}.fs-card{border:0;box-shadow:none}}
+/*
+ * Fushati (cafeteria) screens, on the shared design kit (app/ui/kx.css).
+ * The page frame, tabs, selector and the inventory and reports screens use the kx components directly.
+ * This file restyles the older forms and tables inside the tabs (.fs-*) with the same colours, radius and shadow,
+ * so the whole page looks like one product. A control that already has a kx- class is left to the kit.
+ */
+.fs-root *{box-sizing:border-box}
+.fs-root .kx-page>*{min-width:0}
+
+/* Cards and tiles */
+.fs-card,.fs-stat{background:var(--kx-card);border:1px solid var(--kx-border);border-radius:var(--kx-radius);box-shadow:var(--kx-shadow);padding:18px;margin:0}
+.fs-card>h2{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:17px;line-height:1.3;margin:0 0 14px;color:var(--kx-text)}
+.fs-card>h2>svg:first-child{flex:none;box-sizing:content-box;width:20px;height:20px;padding:7px;border-radius:11px;background:var(--kx-accent-bg);color:var(--kx-accent-ink);border:1px solid var(--kx-accent-line)}
+.fs-card>p,.fs-card>.fs-muted{color:var(--kx-muted);margin:0 0 12px;max-width:80ch}
+.fs-card h3{font-size:15.5px;margin:18px 0 10px}
+.fs-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:18px}
+.fs-stat{display:flex;flex-direction:column;gap:8px;color:var(--kx-muted)}
+.fs-stat strong{font-size:25px;color:var(--kx-accent-ink)}
+.fs-stat small{font-size:12px}
+.fs-stat>svg{color:var(--kx-accent-solid)}
+.fs-span{grid-column:1/-1}
+
+/* Forms */
+.fs-fields{display:flex;gap:14px;flex-wrap:wrap;align-items:end;margin:12px 0}
+.fs-fields label{display:flex;flex:1 1 200px;flex-direction:column;gap:6px;font-weight:700;font-size:14px}
+.fs-fields label input,.fs-fields label select{width:100%}
+fieldset.fs-fields{border:1px solid var(--kx-border);border-radius:14px;padding:10px 14px 14px}
+fieldset.fs-fields legend{font-size:14px;font-weight:700;padding:0 8px;color:var(--kx-text)}
+fieldset.fs-fields label{flex:1 1 240px;flex-direction:row;align-items:center;gap:10px;font-weight:600}
+fieldset.fs-fields label input{width:20px;flex:none}
+.fs-root input:not([class*="kx-"]):not([type=checkbox]):not([type=radio]):not([type=range]),.fs-root select:not([class*="kx-"]),.fs-root textarea:not([class*="kx-"]){min-height:44px;padding:9px 12px;border:1px solid #b9c7c0;border-radius:12px;background:#fff;color:var(--kx-text);font:inherit;font-weight:400;min-width:0;max-width:100%}
+.fs-root input:not([class*="kx-"]):focus-visible,.fs-root select:not([class*="kx-"]):focus-visible,.fs-root textarea:not([class*="kx-"]):focus-visible{border-color:var(--kx-focus)}
+.fs-root input[type=checkbox],.fs-root input[type=radio]{width:20px;height:20px;accent-color:var(--kx-accent-solid)}
+.fs-root .kx-card-body select.kx-select{max-width:min(520px,100%)}
+
+/* Buttons and links that look like buttons */
+.fs-root button:not([class*="kx-"]),.fs-root a.fs-primary-link{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:9px 16px;border-radius:12px;border:1px solid var(--kx-accent-line);background:#fff;color:var(--kx-accent-ink);font:inherit;font-weight:700;font-size:14.5px;cursor:pointer;text-decoration:none;transition:background-color .15s}
+.fs-root button:not([class*="kx-"]):hover:not(:disabled){background:var(--kx-accent-bg)}
+.fs-root button:not([class*="kx-"]):disabled{opacity:.55;cursor:not-allowed}
+.fs-root button[type=submit]:not([class*="kx-"]),.fs-root a.fs-primary-link,.fs-root .fs-checkout button,.fs-root .fs-fields>button:not([type=button]):not([class*="kx-"]){background:var(--kx-accent-solid);color:#fff;border-color:var(--kx-accent-solid)}
+.fs-root button[type=submit]:not([class*="kx-"]):hover:not(:disabled),.fs-root a.fs-primary-link:hover,.fs-root .fs-checkout button:hover:not(:disabled){background:color-mix(in srgb,var(--kx-accent-solid) 88%,#000)}
+.fs-root .fs-danger:not([class*="kx-"]){background:var(--kx-red-bg);border-color:var(--kx-red-line);color:var(--kx-red-ink)}
+.fs-buttons{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.fs-table button:not([class*="kx-"]){min-height:36px;padding:5px 12px;font-size:13.5px;border-radius:10px;margin:2px}
+
+/* Tables */
+.fs-table{overflow-x:auto;border:1px solid var(--kx-border);border-radius:12px}
+.fs-table table{width:100%;border-collapse:collapse;min-width:620px;text-align:start;font-size:14.5px}
+.fs-table th{font-size:13px;font-weight:700;color:var(--kx-slate-ink);background:var(--kx-slate-bg);text-align:start;padding:10px 12px;white-space:nowrap}
+.fs-table td{border-block-start:1px solid var(--kx-border);padding:10px 12px;vertical-align:middle}
+.fs-table tbody tr:hover{background:#f8fbf9}
+.fs-table td small{display:block;color:var(--kx-muted);font-size:12.5px}
+.fs-table a{color:var(--kx-blue-ink);font-weight:600}
+
+/* Menu picker and checkout */
+.fs-products{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}
+.fs-products label{border:1px solid var(--kx-border);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:8px;background:#fff}
+.fs-products small{color:var(--kx-muted)}
+.fs-products input{width:100%}
+.fs-checkout{border-block-start:1px solid var(--kx-border);margin-block-start:18px;padding-block-start:14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;font-size:20px;font-weight:700}
+.fs-video{width:min(500px,100%);margin-block-start:12px;border-radius:12px}
+
+/* Messages */
+.fs-error,.fs-notice,.fs-credential{border-radius:14px;padding:13px 16px;margin:0;font-weight:600;border:1px solid var(--kx-red-line);background:var(--kx-red-bg);color:var(--kx-red-ink)}
+.fs-notice{border-color:var(--kx-green-line);background:var(--kx-green-bg);color:var(--kx-green-ink)}
+.fs-credential{border-color:var(--kx-amber-line);background:var(--kx-amber-bg);color:var(--kx-amber-ink);display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.fs-credential code{font-size:15px;user-select:all}
+.fs-footer{text-align:center;color:var(--kx-muted);font-size:13px;margin-block-start:8px}
+
+@media(max-width:900px){.fs-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:580px){
+ .fs-grid{grid-template-columns:minmax(0,1fr)}
+ .fs-fields{display:block}
+ .fs-fields label{margin:12px 0}
+ .fs-fields button{margin:4px 0}
+}
+@media print{
+ .fs-root button,.fs-footer,.fs-fields{display:none!important}
+ .fs-card{border:0;box-shadow:none}
+}
