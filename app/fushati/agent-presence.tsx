@@ -64,7 +64,7 @@ export default function AgentPresence({language}: {language: 'ar' | 'en'}) {
   const applyStatus = useCallback((next: Status) => {
     visitRef.current = next.visit?.cafeteriaId ?? null;
     spotsRef.current = next.cafeterias.flatMap((c) => (c.latitude === null || c.longitude === null ? [] : [{id: c.id, lat: c.latitude, lng: c.longitude, radiusM: c.radiusM}]));
-    namesRef.current = new Map(next.cafeterias.map((c) => [c.id, label(c)]));
+    namesRef.current = new Map<string, string>(next.cafeterias.map((c): [string, string] => [c.id, label(c)]));
     setStatus(next);
   }, []);
 

@@ -69,7 +69,7 @@ export default function PresencePanel({language}: {language: 'ar' | 'en'}) {
   const nowMs = Date.parse(data.now);
   const minutesAgo = (iso: string) => Math.max(0, Math.round((nowMs - Date.parse(iso)) / 60000));
   const cafes = data.cafeterias.filter((c) => filter === 'all' || c.id === filter);
-  const cafeById = new Map(data.cafeterias.map((c) => [c.id, c]));
+  const cafeById = new Map<string, MapCafeteria>(data.cafeterias.map((c): [string, MapCafeteria] => [c.id, c]));
   const visits = data.visits.filter((v) => filter === 'all' || v.cafeteriaId === filter);
   const present = visits.filter((v) => v.state === 'live' || v.state === 'stale');
   const reasonLabel = (v: MapVisit) => {
