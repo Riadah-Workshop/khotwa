@@ -231,12 +231,11 @@ export async function handleKhotwaAuthentication(request:Request,env:AuthEnv):Pr
  }
  if(path.startsWith('/fushati/')&&!(claim.role==='main_admin'||claim.role==='fushati_admin'||(claim.role==='fushati_agent'&&path==='/fushati/agent')))
   return {response:redirect(claim.role==='parent'?'/parent':claim.role==='manager'?'/manager':'/')};
- if((path==='/api/fushati'||path.startsWith('/api/fushati/'))&&!['main_admin','fushati_admin','fushati_agent','parent','manager'].includes(claim.role))
+ if((path==='/api/fushati'||path.startsWith('/api/fushati/'))&&!['main_admin','fushati_admin','fushati_agent','parent','manager','deputy'].includes(claim.role))
   return {response:Response.json({error:'فسحتي غير متاحة لهذا الدور'},{status:403})};
  if(claim.role==='manager'){
   if(path==='/')return {response:redirect('/manager')};
   if(!(path==='/manager'||path.startsWith('/api/manager/')||path==='/api/fushati'))return {response:path.startsWith('/api/')?Response.json({error:'Read-only school manager role'},{status:403}):redirect('/manager')};
-  if(request.method!=='GET'&&request.method!=='HEAD')return {response:Response.json({error:'Read-only school manager role'},{status:403})};
  }
  if(claim.role!=='main_admin'&&path==='/api/trip-cleanup')return {response:Response.json({error:'Admin only'},{status:403})};
  if(claim.role!=='manager'&&(path==='/manager'||path.startsWith('/api/manager/'))&&claim.role!=='main_admin')return {response:path.startsWith('/api/')?Response.json({error:'غير مسموح'},{status:403}):redirect('/')};
