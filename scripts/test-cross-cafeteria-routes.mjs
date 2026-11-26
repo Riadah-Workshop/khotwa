@@ -6,36 +6,23 @@
 // other isolation tests rely on does not protect it. This test pins the rules:
 //
 //   cafeteria agent   only the cafeterias they are assigned to; no admin operations
-//   cafeteria admin   every cafeteria of every school (a platform-wide role, by design)
+//   cafeteria admin   see test-cafeteria-access-model.mjs
 //   parent            only the children linked to them, and only those children's cafeterias
 //   school manager    a read-only summary of their own school's cafeterias
 //
 // Three schools each have one cafeteria with a marked menu item, account, purchase
 // and bank transfer. The agent is assigned to school a's cafeteria only.
 import assert from 'node:assert/strict';
-import {assertOnlySchool, createHarness, uuid} from './support/school-harness.mjs';
+import {assertOnlySchool, createHarness} from './support/school-harness.mjs';
+import {seedCafeterias} from './support/cafeteria-seed.mjs';
 
 const harness = await createHarness();
 try {
   const {sessions, schoolByKey, seeded, serve, DB} = harness;
-  const legacy = schoolByKey.default, a = schoolByKey.a, b = schoolByKey.b;
-  const now = '2026-11-02T08:00:00.000Z';
+  const a = schoolByKey.a, b = schoolByKey.b;
 
-  const cafe = {}, menu = {}, transfer = {}, student = {};
-  for (const school of [legacy, a, b]) {
-    const key = school.key;
-    cafe[key] = uuid(school, 2);
-    menu[key] = uuid(school, 3);
-    transfer[key] = uuid(school, 4);
-    student[key] = seeded[school.id].students.id;
-    assert.equal(student[key], uuid(school, 1), 'the seeded student has a UUID id');
-    await DB.prepare('INSERT INTO fushati_cafeterias(id,school_id,name,active,created_at) VALUES(?,?,?,1,?)').bind(cafe[key], school.id, `${school.marker}:cafeteria`, now).run();
-    await DB.prepare('INSERT INTO fushati_menu_items(id,cafeteria_id,name,category,price_minor,active,available,created_by,created_at) VALUES(?,?,?,?,?,1,1,?,?)').bind(menu[key], cafe[key], `${school.marker}:menu`, 'general', 300, 'seed', now).run();
-    await DB.prepare('INSERT INTO fushati_accounts(id,school_id,cafeteria_id,student_id,balance_minor,created_at) VALUES(?,?,?,?,?,?)').bind(`acct-${key}`, school.id, cafe[key], student[key], 5000, now).run();
-    await DB.prepare('INSERT INTO fushati_purchases(id,account_id,cafeteria_id,agent_id,items_json,total_minor,day_key,month_key,posted,created_at) VALUES(?,?,?,?,?,?,?,?,1,?)').bind(`purchase-${key}`, `acct-${key}`, cafe[key], 'seed', JSON.stringify([{name: `${school.marker}:purchase`}]), 500, '2026-11-02', '2026-11', now).run();
-    await DB.prepare('INSERT INTO fushati_transfers(id,account_id,cafeteria_id,parent_phone,amount_minor,bank_reference,destination_iban,receipt_key,receipt_mime,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)').bind(transfer[key], `acct-${key}`, cafe[key], `05${school.digits}`, 1000, `${school.marker}-ref`, `SA-${school.marker}`, 'receipt', 'image/png', now).run();
-  }
-  await DB.prepare('INSERT INTO fushati_assignments(user_id,cafeteria_id) VALUES(?,?)').bind('fushati-agent-1', cafe.a).run();
+  const {cafe, menu, transfer, student, assign} = await seedCafeterias({DB, seeded, schoolByKey});
+  await assign(harness.fushatiIds.agent1, cafe.a, ['pos', 'menu_propose']);
 
   for (const school of [a, b]) assert.equal(seeded[school.id].students.phone, `05${school.digits}`, 'the seeded child belongs to the parent of its school');
 
@@ -52,8 +39,8 @@ try {
   const data = JSON.parse(boot.text);
   assert.deepEqual(ids(data.cafeterias), [cafe.a], 'the agent sees only the cafeteria they are assigned to');
   assert.deepEqual(ids(data.menu), [menu.a], 'the agent sees only that cafeteria\'s menu');
-  assert.ok(data.purchases.length >= 1 && data.purchases.every((purchase) => purchase.cafeteria_id === cafe.a), 'the agent sees only that cafeteria\'s purchases');
-  assert.deepEqual([data.transfers, data.users, data.assignments, data.schools], [[], [], [], []], 'the agent receives no transfers, user list, assignments or school list');
+  assert.deepEqual([data.purchases, data.transfers, data.users, data.assignments, data.schools], [[], [], [], [], []], 'an ordinary agent receives no sales, transfers, user list, assignments or school list');
+  assert.deepEqual(data.permissions, {[cafe.a]: ['pos', 'menu_propose']}, 'the agent is told what he may do, in his cafeteria only');
 
   // Administration is closed to agents, for their own cafeteria as much as for another one.
   for (const target of [cafe.a, cafe.b, cafe.default]) {
@@ -72,10 +59,6 @@ try {
   const own = await post(agent, 'create-menu', {cafeteriaId: cafe.a, name: 'proposal', category: 'x'});
   assert.equal(own.status, 200, `agent adds to their own cafeteria: HTTP ${own.status} ${own.text.slice(0, 160)}`);
   assert.equal(await count('SELECT COUNT(*) AS n FROM fushati_menu_items WHERE cafeteria_id=?', cafe.a), 2, 'the proposal was added to their own cafeteria');
-
-  // ---- cafeteria admin: every cafeteria of every school, by design --------------------------------------------
-  const admin = JSON.parse((await get(sessions.fushatiAdmin, 'op=bootstrap')).text);
-  assert.deepEqual(ids(admin.cafeterias), [cafe.a, cafe.b, cafe.default].sort(), 'the cafeteria administrator manages the cafeterias of all schools');
 
   // ---- parents: only their own children's cafeterias ------------------------------------------------------------
   for (const [who, mine, other] of [['a', a, b], ['b', b, a]]) {
@@ -109,7 +92,7 @@ try {
     assertOnlySchool(summary.text, school, `manager ${school.key} cafeteria summary`);
   }
 
-  console.log('Cafeteria isolation passed: agent limited to the assigned cafeteria and to proposing menu items, administration closed to agents, administrator platform-wide, parents limited to their own children, managers limited to their own school.');
+  console.log('Cafeteria isolation passed: agent limited to the assigned cafeteria and to proposing menu items, administration closed to agents, parents limited to their own children, managers limited to their own school.');
 } finally {
   await harness.close();
 }
