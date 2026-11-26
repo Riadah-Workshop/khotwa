@@ -25,12 +25,14 @@ export function getSchoolContext():SchoolContext {
 }
 // Apply only to SQL tokens; values inside quoted SQL strings and comments are untouched.
 // Drizzle quotes identifiers, whereas older raw SQL mostly uses bare identifiers.
+let remembered:D1Database|undefined;
 export function getTenantDb():D1Database {
+ if(remembered)return remembered;
  const school=getSchoolContext(),database=env.DB;
  if(!database)throw new Error('DB binding unavailable');
  if(school.schoolId===LEGACY_SCHOOL_ID)return database;
  // Return real prepared statements so D1 batch() and Drizzle continue working.
- return {
+ return remembered={
   prepare(query:string){return database.prepare(rewriteSchoolSql(query,school.schoolId));},
   batch(statements:D1PreparedStatement[]){return database.batch(statements);},
   exec(query:string){return database.exec(rewriteSchoolSql(query,school.schoolId));},
