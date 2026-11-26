@@ -90,6 +90,9 @@ export const LIVE_WINDOW_MS = 3 * 60_000;
 export const SIGNAL_LOST_MS = 30 * 60_000;
 /** Reports closer together than this are acknowledged but not stored again. */
 export const PING_MIN_INTERVAL_MS = 10_000;
+
+/** How long a finished stay keeps the coordinates of the agent's phone. The times of the stay are kept. */
+export const POSITION_RETENTION_DAYS = 30;
 /** Consecutive reports clearly outside the area before the phone records the departure. */
 export const OUTSIDE_FIXES_TO_LEAVE = 2;
 

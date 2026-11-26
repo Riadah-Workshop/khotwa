@@ -7,6 +7,7 @@ import {db, now} from './core';
 import {agentContactPhone} from './identifiers';
 import {
   PING_MIN_INTERVAL_MS,
+  POSITION_RETENTION_DAYS,
   SIGNAL_LOST_MS,
   distanceMeters,
   durationMinutes,
@@ -26,8 +27,8 @@ export type VisitRow = {
   day_key: string;
   arrived_at: string;
   arrive_distance_m: number;
-  last_lat: number;
-  last_lng: number;
+  last_lat: number | null;
+  last_lng: number | null;
   last_accuracy_m: number;
   last_seen_at: string;
   left_at: string | null;
@@ -53,6 +54,24 @@ export async function closeIfLost(visit: VisitRow | null, nowMs = Date.now()): P
   return null;
 }
 
+/**
+ * Retention of agent positions: a finished stay keeps its times, distance and reason, and loses its coordinates
+ * after POSITION_RETENTION_DAYS. A stay whose phone fell silent is first closed at its last report (the same
+ * rule as closeIfLost), so a forgotten open stay cannot keep coordinates forever. There is no scheduled job in
+ * this deployment, so this runs when an agent checks in; it is idempotent and reads only what still needs work.
+ */
+export async function purgeOldPositions(nowMs: number): Promise<{closed: number; blanked: number}> {
+  const quiet = new Date(nowMs - SIGNAL_LOST_MS).toISOString();
+  const cutoff = new Date(nowMs - POSITION_RETENTION_DAYS * 86_400_000).toISOString();
+  const [closed, blanked] = await db().batch([
+    db().prepare("UPDATE fushati_visits SET left_at=last_seen_at,leave_reason='signal_lost' WHERE left_at IS NULL AND last_seen_at<?").bind(quiet),
+    db()
+      .prepare('UPDATE fushati_visits SET arrive_lat=NULL,arrive_lng=NULL,last_lat=NULL,last_lng=NULL WHERE left_at IS NOT NULL AND left_at<? AND (arrive_lat IS NOT NULL OR last_lat IS NOT NULL)')
+      .bind(cutoff),
+  ]);
+  return {closed: closed.meta.changes, blanked: blanked.meta.changes};
+}
+
 export type CheckInResult =
   | {ok: true; visitId: string; already: boolean; arrivedAt: string}
   | {ok: false; code: 'no_location' | 'too_far'; distanceM: number; radiusM: number};
@@ -60,6 +79,7 @@ export type CheckInResult =
 /** Record an arrival if the reported position is at the cafeteria. */
 export async function checkIn(userId: string, cafeteria: CafeteriaPoint, position: Position): Promise<CheckInResult> {
   const stamp = now();
+  await purgeOldPositions(Date.parse(stamp));
   const open = await closeIfLost(await openVisit(userId), Date.parse(stamp));
   if (!hasPoint(cafeteria)) return {ok: false, code: 'no_location', distanceM: 0, radiusM: cafeteria.arrival_radius_m};
   const distanceM = Math.round(distanceMeters(position, {lat: cafeteria.latitude, lng: cafeteria.longitude}));
@@ -191,7 +211,7 @@ export async function visitsFor(cafeteriaIds: string[], sinceIso: string, nowMs:
       durationMin: durationMinutes(row.arrived_at, endedAt, nowMs),
       arriveDistanceM: row.arrive_distance_m,
       lastSeenAt: row.last_seen_at,
-      position: open ? {lat: row.last_lat, lng: row.last_lng, accuracyM: row.last_accuracy_m} : null,
+      position: open && row.last_lat !== null && row.last_lng !== null ? {lat: row.last_lat, lng: row.last_lng, accuracyM: row.last_accuracy_m} : null,
     };
   });
 }
