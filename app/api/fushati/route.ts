@@ -8,7 +8,8 @@ import {tableName} from '../../../lib/school-sql';
 import {parentPhone as normalizeParentPhone} from '../../../lib/parent-view';
 import {normalizeAgentIdentifier} from '../../../lib/fushati/identifiers';
 import {issueFushatiInvite} from '../../../lib/fushati/invitations';
-import {db,response,now,keyDate,moneyMinor,moneySar,isCafeAdmin,isCafeStaff,permittedCafeteria,permittedStudent,activeStudent,getOrCreateAccount,makePermanentCard,makeQrToken,readQrToken,audit} from '../../../lib/fushati/core';
+import {AGENT_DEFAULT_PERMISSIONS,cleanPermissions,grantAdministers,grantAllows,parsePermissions,type FushatiPermission} from '../../../lib/fushati/permissions';
+import {db,response,now,keyDate,moneyMinor,moneySar,isCafeStaff,permittedCafeteria,cafeteriaGrants,permittedStudent,activeStudent,getOrCreateAccount,makePermanentCard,makeQrToken,readQrToken,audit} from '../../../lib/fushati/core';
 export const dynamic='force-dynamic';
 const id=z.string().uuid();
 const schoolId=z.string().regex(/^(default|[a-f0-9]{12})$/);
@@ -39,9 +40,23 @@ async function mustChange(access:{role:string;userId:string}){
  const row=await db().prepare('SELECT must_change_password FROM fushati_users WHERE id=? AND active=1').bind(access.userId).first<{must_change_password:number}>();
  return !row||row.must_change_password===1;
 }
+// The cafeterias this user may reach (see cafeteriaGrants): everything for the system administrator, otherwise only the assigned ones.
 async function cafesFor(access:{role:string;userId:string}){
- if(access.role==='fushati_agent')return (await db().prepare('SELECT c.*,s.name AS school_name FROM fushati_cafeterias c JOIN khotwa_schools s ON s.id=c.school_id JOIN fushati_assignments a ON a.cafeteria_id=c.id WHERE a.user_id=? AND c.active=1 AND s.active=1 ORDER BY s.name,c.name').bind(access.userId).all<any>()).results;
- return (await db().prepare('SELECT c.*,s.name AS school_name FROM fushati_cafeterias c JOIN khotwa_schools s ON s.id=c.school_id WHERE s.active=1 ORDER BY s.name,c.name').all<any>()).results;
+ const ids=[...(await cafeteriaGrants(access)).keys()];
+ if(!ids.length)return [];
+ return (await db().prepare('SELECT c.*,s.name AS school_name FROM fushati_cafeterias c JOIN khotwa_schools s ON s.id=c.school_id WHERE s.active=1 AND c.id IN (SELECT value FROM json_each(?))'+(access.role==='fushati_agent'?' AND c.active=1':'')+' ORDER BY s.name,c.name').bind(JSON.stringify(ids)).all<any>()).results;
+}
+// An agent's relation to the cafeterias this administrator administers: does he work in any of them, and only in them?
+async function agentScope(access:{role:string;userId:string},agentId:string){
+ const administered=[...await cafeteriaGrants(access)].filter(([,grant])=>grantAdministers(grant)).map(([cafeteriaId])=>cafeteriaId);
+ const rows=(await db().prepare("SELECT a.cafeteria_id FROM fushati_assignments a JOIN fushati_users u ON u.id=a.user_id WHERE a.user_id=? AND u.role='fushati_agent'").bind(agentId).all<{cafeteria_id:string}>()).results;
+ return {administered,mine:rows.some(r=>administered.includes(r.cafeteria_id)),exclusive:rows.length>0&&rows.every(r=>administered.includes(r.cafeteria_id))};
+}
+// What a staff user may do in each cafeteria, for the screens.
+async function myPermissions(access:{role:string;userId:string}){
+ const out:Record<string,FushatiPermission[]>={};
+ for(const [cafeteriaId,grant] of await cafeteriaGrants(access))out[cafeteriaId]=[...grant.permissions];
+ return out;
 }
 async function parentBootstrap(phone:string){
  const schools=await parentLinkedSchools(db(),phone),students:any[]=[];
@@ -100,14 +115,18 @@ export async function GET(req:Request){
   if(!isCafeStaff(access))return err('غير مسموح',403);
   const cafes=await cafesFor(access);
   if(op==='bootstrap'){
-   const menu=(await db().prepare('SELECT m.*,COALESCE(inv.tracked,0) AS stock_tracked,COALESCE(inv.on_hand,0) AS stock_qty,COALESCE(inv.low_stock_threshold,5) AS low_stock_threshold FROM fushati_menu_items m LEFT JOIN fushati_inventory inv ON inv.menu_item_id=m.id ORDER BY m.created_at DESC').all<any>()).results.filter(m=>cafes.some(c=>c.id===m.cafeteria_id));
-   const assignments=access.role==='fushati_agent'?[]:(await db().prepare('SELECT * FROM fushati_assignments').all()).results;
-   const users=!isCafeAdmin(access)?[]:(await db().prepare('SELECT id,email,login_identifier,full_name,role,active,must_change_password,activated_at,created_at FROM fushati_users ORDER BY created_at DESC').all<any>()).results.filter(u=>access.role==='main_admin'||u.role==='fushati_agent');
-   const transfers=isCafeAdmin(access)?(await db().prepare('SELECT t.id,t.cafeteria_id,t.account_id,t.parent_phone,t.amount_minor,t.bank_reference,t.status,t.created_at,t.review_note,a.student_id,a.school_id FROM fushati_transfers t JOIN fushati_accounts a ON a.id=t.account_id ORDER BY t.created_at DESC LIMIT 300').all<any>()).results.filter(t=>cafes.some(c=>c.id===t.cafeteria_id)):[];
-   const paid=(await db().prepare('SELECT p.cafeteria_id,p.total_minor,p.created_at FROM fushati_purchases p WHERE p.posted=1 ORDER BY p.created_at DESC LIMIT 1000').all<any>()).results.filter(p=>cafes.some(c=>c.id===p.cafeteria_id));
+   const grants=await cafeteriaGrants(access),platform=access.role==='main_admin';
+   const idsWith=(permission:FushatiPermission)=>JSON.stringify(cafes.filter(c=>grantAllows(grants.get(c.id),permission)).map(c=>c.id));
+   const administered=JSON.stringify(cafes.filter(c=>grantAdministers(grants.get(c.id))).map(c=>c.id));
+   const stockVisible=new Set<string>(JSON.parse(idsWith('inventory_view')));
+   const menu=(await db().prepare('SELECT m.*,COALESCE(inv.tracked,0) AS stock_tracked,COALESCE(inv.on_hand,0) AS stock_qty,COALESCE(inv.low_stock_threshold,5) AS low_stock_threshold FROM fushati_menu_items m LEFT JOIN fushati_inventory inv ON inv.menu_item_id=m.id WHERE m.cafeteria_id IN (SELECT value FROM json_each(?)) ORDER BY m.created_at DESC').bind(JSON.stringify(cafes.map(c=>c.id))).all<any>()).results.map(m=>stockVisible.has(m.cafeteria_id)?m:{...m,stock_tracked:0,stock_qty:0,low_stock_threshold:5});
+   const assignments=(await db().prepare(platform?'SELECT user_id,cafeteria_id,permissions FROM fushati_assignments':'SELECT user_id,cafeteria_id,permissions FROM fushati_assignments WHERE cafeteria_id IN (SELECT value FROM json_each(?))').bind(...(platform?[]:[administered])).all<{user_id:string;cafeteria_id:string;permissions:string}>()).results.map(a=>({user_id:a.user_id,cafeteria_id:a.cafeteria_id,permissions:parsePermissions(a.permissions)}));
+   const users=(await db().prepare(platform?'SELECT id,email,login_identifier,full_name,role,active,must_change_password,activated_at,created_at FROM fushati_users ORDER BY created_at DESC':"SELECT id,email,login_identifier,full_name,role,active,must_change_password,activated_at,created_at FROM fushati_users WHERE role='fushati_agent' AND id IN (SELECT user_id FROM fushati_assignments WHERE cafeteria_id IN (SELECT value FROM json_each(?))) ORDER BY created_at DESC").bind(...(platform?[]:[administered])).all<any>()).results;
+   const transfers=(await db().prepare('SELECT t.id,t.cafeteria_id,t.account_id,t.parent_phone,t.amount_minor,t.bank_reference,t.status,t.created_at,t.review_note,a.student_id,a.school_id FROM fushati_transfers t JOIN fushati_accounts a ON a.id=t.account_id WHERE t.cafeteria_id IN (SELECT value FROM json_each(?)) ORDER BY t.created_at DESC LIMIT 300').bind(idsWith('transfers_review')).all<any>()).results;
+   const paid=(await db().prepare('SELECT p.cafeteria_id,p.total_minor,p.created_at FROM fushati_purchases p WHERE p.posted=1 AND p.cafeteria_id IN (SELECT value FROM json_each(?)) ORDER BY p.created_at DESC LIMIT 1000').bind(idsWith('sales_view')).all<any>()).results;
    const mustChangePassword=await mustChange(access);
-   const schools=isCafeAdmin(access)?(await db().prepare("SELECT id,name,region,city FROM khotwa_schools WHERE active=1 AND id<>'default' ORDER BY name").all()).results:[];
-   return response({cafeterias:cafes,menu,users,assignments,transfers,purchases:paid,schools,role:access.role,mustChangePassword});
+   const schools=platform?(await db().prepare("SELECT id,name,region,city FROM khotwa_schools WHERE active=1 AND id<>'default' ORDER BY name").all()).results:[];
+   return response({cafeterias:cafes,menu,users,assignments,transfers,purchases:paid,schools,role:access.role,mustChangePassword,permissions:await myPermissions(access)});
   }
   if(await mustChange(access))return err('يجب تغيير كلمة المرور المؤقتة أولاً',403);
   if(op==='lookup'){
@@ -123,9 +142,8 @@ export async function GET(req:Request){
     allowedItemIds:JSON.parse(account.allowed_item_ids||'[]')});
   }
   if(op==='balances'){
-   if(!isCafeAdmin(access))return err('صلاحية مدير المقصف فقط',403);
    const selected=id.parse(search.get('cafeteriaId'));
-   const cafe=await permittedCafeteria(access,selected,true);if(!cafe)return err('المقصف غير متاح',404);
+   const cafe=await permittedCafeteria(access,selected,true,'balances_view');if(!cafe)return err('المقصف غير متاح',403);
    const accounts=(await db().prepare('SELECT id,student_id,balance_minor,daily_limit_minor,monthly_limit_minor,active FROM fushati_accounts WHERE cafeteria_id=? ORDER BY created_at DESC LIMIT 500').bind(selected).all<any>()).results;
    const students=[];
    for(const acc of accounts){
@@ -135,9 +153,8 @@ export async function GET(req:Request){
    return response({accounts:students});
   }
   if(op==='export'){
-   if(!isCafeAdmin(access))return err('للمدير فقط',403);
    const selected=id.parse(search.get('cafeteriaId'));
-   const cafe=await permittedCafeteria(access,selected,true);if(!cafe)return err('المقصف غير متاح',404);
+   const cafe=await permittedCafeteria(access,selected,true,'reports');if(!cafe)return err('المقصف غير متاح',403);
    const from=search.get('from')||'0000-01-01',to=search.get('to')||'9999-12-31';
    if(!/^\d{4}-\d{2}-\d{2}$/.test(from)||!/^\d{4}-\d{2}-\d{2}$/.test(to)||from>to)return err('تاريخ التقرير غير صحيح',400);
    const rows=(await db().prepare('SELECT id,account_id,total_minor,agent_id,day_key,created_at FROM fushati_purchases WHERE cafeteria_id=? AND posted=1 AND day_key BETWEEN ? AND ? ORDER BY created_at DESC LIMIT 10000').bind(selected,from,to).all<any>()).results;
@@ -227,9 +244,16 @@ export async function POST(req:Request){
    const updated=await db().prepare('SELECT balance_minor FROM fushati_accounts WHERE id=?').bind(account.id).first<any>();
    return response({ok:true,purchaseId:v.requestId,totalMinor:total,balanceMinor:updated?.balance_minor||0,duplicate:results[2].meta.changes!==1});
   }
-  if(!isCafeAdmin(access)&&!['create-menu'].includes(op))return err('ليس لديك صلاحية الإدارة',403);
+  // Agents and supervisors reach only these, and each one checks the permission on the cafeteria itself.
+  if(access.role==='fushati_agent'&&!['create-menu','edit-menu','delete-menu','stock-adjust','review-transfer'].includes(op))return err('ليس لديك صلاحية الإدارة',403);
+  if(['create-cafeteria','delete-cafeteria','edit-cafeteria','deactivate-cafeteria'].includes(op)&&access.role!=='main_admin')return err('اسم المقصف والمدرسة وبيانات البنك يعدلها مدير نظام خطوة فقط. يمكنك إضافة اسم مختصر للمقصف.',403);
+  if(op==='set-alias'){
+   const v=parse(data,z.object({id,alias:z.string().trim().max(60)}));
+   if(!grantAdministers((await cafeteriaGrants(access)).get(v.id)))return err('المقصف غير متاح',403);
+   await db().prepare('UPDATE fushati_cafeterias SET alias=? WHERE id=?').bind(v.alias,v.id).run();
+   await audit(access.userId,op,'cafeteria',v.id);return response({ok:true});
+  }
   if(op==='create-cafeteria'){
-   if(!isCafeAdmin(access))return err('للمدير فقط',403);
    const v=parse(data,z.object({schoolId, name,bankName:z.string().trim().max(130),iban:z.string().trim().max(34),beneficiary:z.string().trim().max(130)}));
    const school=await db().prepare("SELECT id FROM khotwa_schools WHERE id=? AND active=1 AND id<>'default'").bind(v.schoolId).first();if(!school)return err('اختر مدرسة موجودة',400);
    if(v.iban&&!/^SA\d{2}[A-Z0-9]{20}$/.test(v.iban))return err('رقم IBAN يجب أن يبدأ بـ SA ويتكون من 24 خانة',400);
@@ -262,9 +286,11 @@ export async function POST(req:Request){
    await audit(access.userId,op,'cafeteria',v.id);return response({ok:true});
   }
   if(op==='create-user'){
-   const v=parse(data,z.object({fullName:name,email:email.optional(),identifier:z.string().trim().max(100).optional(),role:z.enum(['fushati_admin','fushati_agent']),cafeteriaIds:z.array(id).max(100)}));
+   const v=parse(data,z.object({fullName:name,email:email.optional(),identifier:z.string().trim().max(100).optional(),role:z.enum(['fushati_admin','fushati_agent']),cafeteriaIds:z.array(id).max(100),permissions:z.array(z.string()).max(30).optional()}));
    if(v.role==='fushati_admin'&&access.role!=='main_admin')return err('إنشاء مدير فسحتي لمدير نظام خطوة فقط',403);
-   if(v.role==='fushati_agent'&&!v.cafeteriaIds.length)return err('يجب تحديد مقصف للموظف',400);
+   if(!v.cafeteriaIds.length)return err(v.role==='fushati_admin'?'يجب تحديد مقصف واحد على الأقل للمدير':'يجب تحديد مقصف للموظف',400);
+   const grantList=v.role==='fushati_admin'?['*']:cleanPermissions(v.permissions??AGENT_DEFAULT_PERMISSIONS);
+   if(v.role==='fushati_agent'&&!grantList.length)return err('حدد صلاحية واحدة على الأقل للموظف',400);
    const cafes=await cafesFor(access);if(v.cafeteriaIds.some((a:string)=>!cafes.some(c=>c.id===a&&c.active)))return err('أحد المقاصف غير متاح',403);
    const userId=crypto.randomUUID(),isManager=v.role==='fushati_admin';
    const identifier=isManager?'':normalizeAgentIdentifier(v.identifier||'');
@@ -272,7 +298,7 @@ export async function POST(req:Request){
    if(!isManager&&!identifier)return err('أدخل رقم جوال سعودي صحيح أو رقم هوية/إقامة مكوناً من 10 أرقام',400);
    const accountEmail=isManager?v.email!:`agent-${userId}@fushati.invalid`;
    const password=isManager?'':temporaryPassword(),hash=isManager?'!pending-email-activation!':await hashPassword(password);
-   await db().batch([db().prepare('INSERT INTO fushati_users(id,email,login_identifier,full_name,role,password_hash,must_change_password,activated_at,created_at) VALUES(?,?,?,?,?,?,?,?,?)').bind(userId,accountEmail,identifier,v.fullName,v.role,hash,isManager?0:1,isManager?null:now(),now()),...v.cafeteriaIds.map((c:string)=>db().prepare('INSERT INTO fushati_assignments(user_id,cafeteria_id) VALUES(?,?)').bind(userId,c))]);
+   await db().batch([db().prepare('INSERT INTO fushati_users(id,email,login_identifier,full_name,role,password_hash,must_change_password,activated_at,created_at) VALUES(?,?,?,?,?,?,?,?,?)').bind(userId,accountEmail,identifier,v.fullName,v.role,hash,isManager?0:1,isManager?null:now(),now()),...v.cafeteriaIds.map((c:string)=>db().prepare('INSERT INTO fushati_assignments(user_id,cafeteria_id,permissions) VALUES(?,?,?)').bind(userId,c,JSON.stringify(grantList)))]);
    await audit(access.userId,op,'user',userId);
    if(isManager){const delivery=await issueFushatiInvite(db(),env,{id:userId,email:accountEmail,full_name:v.fullName});return response({ok:true,id:userId,invitationStatus:delivery.status,invitationErrorCode:delivery.errorCode||null});}
    return response({ok:true,id:userId,loginIdentifier:v.identifier,temporaryPassword:password});
@@ -281,6 +307,7 @@ export async function POST(req:Request){
    const v=parse(data,z.object({id}));
    const row=await db().prepare('SELECT role FROM fushati_users WHERE id=?').bind(v.id).first<any>();if(!row)return err('المستخدم غير موجود',404);
    if(row.role==='fushati_admin'&&access.role!=='main_admin')return err('للمدير العام فقط',403);
+   if(access.role!=='main_admin'){const scope=await agentScope(access,v.id);if(!scope.mine)return err('المستخدم غير موجود',404);if(!scope.exclusive)return err('الموظف يعمل أيضاً في مقاصف لا تديرها. أزل مقاصفك من حسابه بدلاً من حذفه.',409);}
    const history=await db().prepare('SELECT 1 FROM fushati_purchases WHERE agent_id=? LIMIT 1').bind(v.id).first()
     || await db().prepare('SELECT 1 FROM fushati_menu_items WHERE created_by=? LIMIT 1').bind(v.id).first()
     || await db().prepare('SELECT 1 FROM fushati_transfers WHERE reviewed_by=? LIMIT 1').bind(v.id).first();
@@ -289,9 +316,17 @@ export async function POST(req:Request){
    await audit(access.userId,op,'user',v.id);return response({ok:true});
   }
   if(op==='edit-user'||op==='reset-user'){
-   const v=parse(data,z.object({id,fullName:name.optional(),active:flag.optional(),cafeteriaIds:z.array(id).max(100).optional()}));
+   const v=parse(data,z.object({id,fullName:name.optional(),active:flag.optional(),cafeteriaIds:z.array(id).max(100).optional(),permissions:z.array(z.string()).max(30).optional()}));
    const row=await db().prepare('SELECT * FROM fushati_users WHERE id=?').bind(v.id).first<any>();if(!row)return err('المستخدم غير موجود',404);
    if(row.role==='fushati_admin'&&access.role!=='main_admin')return err('لا يمكن تعديل مدير فسحتي',403);
+   // A cafeteria administrator reaches only agents who work in his cafeterias. If the agent also works elsewhere he may change
+   // only the assignment in his own cafeterias: not the name, the active flag, or the password (it would give access to the others).
+   let scopeIds:string[]|null=null,exclusiveAgent=false;
+   if(access.role!=='main_admin'){
+    const scope=await agentScope(access,v.id);if(!scope.mine)return err('المستخدم غير موجود',404);
+    if(!scope.exclusive&&(op==='reset-user'||v.fullName!==undefined||v.active!==undefined))return err('الموظف يعمل أيضاً في مقاصف لا تديرها. يمكنك تعديل مقاصفه وصلاحياته في مقاصفك فقط.',409);
+    scopeIds=scope.administered;exclusiveAgent=scope.exclusive;
+   }
    if(op==='reset-user'){
     if(row.role==='fushati_admin'){
      await db().prepare("UPDATE fushati_users SET password_hash='!pending-email-activation!',activated_at=NULL,session_version=session_version+1 WHERE id=?").bind(v.id).run();
@@ -302,25 +337,41 @@ export async function POST(req:Request){
     await audit(access.userId,op,'user',v.id);return response({ok:true,loginIdentifier:row.login_identifier,temporaryPassword:password});
    }
    if(v.cafeteriaIds){const cafes=await cafesFor(access);if(v.cafeteriaIds.some((c:string)=>!cafes.some(x=>x.id===c&&x.active)))return err('لا يمكنك تعيين موظف لمقصف غير متاح',403);}
+   const changeAssignments=v.cafeteriaIds!==undefined||v.permissions!==undefined;
+   let assignmentStatements:D1PreparedStatement[]=[];
+   if(changeAssignments){
+    const current=(await db().prepare('SELECT cafeteria_id,permissions FROM fushati_assignments WHERE user_id=?').bind(v.id).all<{cafeteria_id:string;permissions:string}>()).results;
+    const chosen=v.cafeteriaIds??current.filter(a=>!scopeIds||scopeIds.includes(a.cafeteria_id)).map(a=>a.cafeteria_id);
+    if(row.role==='fushati_agent'&&!chosen.length&&exclusiveAgent)return err('يجب أن يبقى الموظف في مقصف واحد على الأقل، أو أوقف حسابه.',400);
+    const explicit=v.permissions===undefined?null:cleanPermissions(v.permissions);
+    if(row.role==='fushati_agent'&&explicit&&!explicit.length)return err('حدد صلاحية واحدة على الأقل للموظف',400);
+    assignmentStatements=[
+     scopeIds?db().prepare('DELETE FROM fushati_assignments WHERE user_id=? AND cafeteria_id IN (SELECT value FROM json_each(?))').bind(v.id,JSON.stringify(scopeIds)):db().prepare('DELETE FROM fushati_assignments WHERE user_id=?').bind(v.id),
+     ...chosen.map((c:string)=>{
+      const previous=current.find(a=>a.cafeteria_id===c);
+      const grantList=row.role==='fushati_admin'?['*']:explicit??(previous?parsePermissions(previous.permissions):[...AGENT_DEFAULT_PERMISSIONS]);
+      return db().prepare('INSERT INTO fushati_assignments(user_id,cafeteria_id,permissions) VALUES(?,?,?)').bind(v.id,c,JSON.stringify(grantList));
+     })
+    ];
+   }
    await db().batch([
     db().prepare('UPDATE fushati_users SET full_name=?,active=?,session_version=session_version+1 WHERE id=?').bind(v.fullName??row.full_name,v.active===undefined?row.active:v.active?1:0,v.id),
-    ...(v.cafeteriaIds?[db().prepare('DELETE FROM fushati_assignments WHERE user_id=?').bind(v.id),...v.cafeteriaIds.map((c:string)=>db().prepare('INSERT INTO fushati_assignments(user_id,cafeteria_id) VALUES(?,?)').bind(v.id,c))]:[])
+    ...assignmentStatements
    ]);
    await audit(access.userId,op,'user',v.id);return response({ok:true});
   }
   if(op==='create-menu'){
    if(!isCafeStaff(access))return err('غير مسموح',403);
    const v=parse(data,z.object({cafeteriaId:id,name,category:z.string().trim().min(1).max(70),price:cash.optional()}));
-   const cafe=await permittedCafeteria(access,v.cafeteriaId);if(!cafe)return err('المقصف غير متاح',403);
-   const price=isCafeAdmin(access)?moneyMinor(v.price??'0'):0;
+   const manage=await permittedCafeteria(access,v.cafeteriaId,false,'menu_manage'),cafe=manage||await permittedCafeteria(access,v.cafeteriaId,false,'menu_propose');if(!cafe)return err('المقصف غير متاح',403);
+   const price=manage?moneyMinor(v.price??'0'):0;
    if(price===null||price>1000000)return err('السعر غير صحيح',400);
-   const newId=crypto.randomUUID();await db().prepare('INSERT INTO fushati_menu_items(id,cafeteria_id,name,category,price_minor,active,available,created_by,created_at) VALUES(?,?,?,?,?,?,?,?,?)').bind(newId,cafe.id,v.name,v.category,price,isCafeAdmin(access)&&price>0?1:0,1,access.userId,now()).run();
-   await audit(access.userId,op,'menu',newId);return response({ok:true,id:newId,pending:!isCafeAdmin(access)});
+   const newId=crypto.randomUUID();await db().prepare('INSERT INTO fushati_menu_items(id,cafeteria_id,name,category,price_minor,active,available,created_by,created_at) VALUES(?,?,?,?,?,?,?,?,?)').bind(newId,cafe.id,v.name,v.category,price,manage&&price>0?1:0,1,access.userId,now()).run();
+   await audit(access.userId,op,'menu',newId);return response({ok:true,id:newId,pending:!manage});
   }
   if(op==='stock-adjust'){
-   if(!isCafeAdmin(access))return err('مدير فسحتي فقط يمكنه تعديل المخزون',403);
    const v=parse(data,z.object({menuId:id,delta:z.number().int().min(-100000).max(100000),tracked:flag,threshold:z.number().int().min(0).max(100000).default(5),reason:z.enum(['opening','receipt','correction']).default('correction')}));
-   const item=await db().prepare('SELECT id,cafeteria_id FROM fushati_menu_items WHERE id=?').bind(v.menuId).first<any>();if(!item||!await permittedCafeteria(access,item.cafeteria_id,true))return err('المنتج غير متاح',403);
+   const item=await db().prepare('SELECT id,cafeteria_id FROM fushati_menu_items WHERE id=?').bind(v.menuId).first<any>();if(!item||!await permittedCafeteria(access,item.cafeteria_id,true,'inventory_manage'))return err('المنتج غير متاح',403);
    if(!v.tracked&&v.delta!==0)return err('فعّل تتبع المخزون أولاً',400);
    const current=await db().prepare('SELECT on_hand FROM fushati_inventory WHERE menu_item_id=?').bind(v.menuId).first<{on_hand:number}>();
    if(!current)return err('لم يتم إنشاء سجل المخزون',503);
@@ -334,7 +385,7 @@ export async function POST(req:Request){
   }
   if(op==='delete-menu'){
    const v=parse(data,z.object({id}));
-   const item=await db().prepare('SELECT id,cafeteria_id FROM fushati_menu_items WHERE id=?').bind(v.id).first<any>();if(!item)return err('المنتج غير موجود',404);
+   const item=await db().prepare('SELECT id,cafeteria_id FROM fushati_menu_items WHERE id=?').bind(v.id).first<any>();if(!item)return err('المنتج غير موجود',404);if(!await permittedCafeteria(access,item.cafeteria_id,true,'menu_manage'))return err('المنتج غير متاح',403);
    const history=await db().prepare("SELECT 1 FROM fushati_purchases p,json_each(p.items_json) line WHERE p.cafeteria_id=? AND json_extract(line.value,'$.id')=? LIMIT 1").bind(item.cafeteria_id,v.id).first();
    if(history)return err('المنتج مستخدم في مشتريات تاريخية. أوقفه بدلاً من الحذف.',409);
    await db().batch([db().prepare('DELETE FROM fushati_stock_movements WHERE menu_item_id=?').bind(v.id),db().prepare('DELETE FROM fushati_inventory WHERE menu_item_id=?').bind(v.id),db().prepare('DELETE FROM fushati_menu_items WHERE id=?').bind(v.id)]);
@@ -343,7 +394,7 @@ export async function POST(req:Request){
   if(op==='edit-menu'){
    const v=parse(data,z.object({id,name,category:z.string().trim().min(1).max(70),price:cash,active:flag,available:flag}));
    const price=moneyMinor(v.price);if(price===null||price>1000000||v.active&&price===0)return err('حدد سعراً صحيحاً قبل تفعيل المنتج',400);
-   const row=await db().prepare('SELECT id FROM fushati_menu_items WHERE id=?').bind(v.id).first();if(!row)return err('المنتج غير موجود',404);
+   const row=await db().prepare('SELECT id,cafeteria_id FROM fushati_menu_items WHERE id=?').bind(v.id).first<{id:string;cafeteria_id:string}>();if(!row)return err('المنتج غير موجود',404);if(!await permittedCafeteria(access,row.cafeteria_id,true,'menu_manage'))return err('المنتج غير متاح',403);
    await db().prepare('UPDATE fushati_menu_items SET name=?,category=?,price_minor=?,active=?,available=? WHERE id=?').bind(v.name,v.category,price,v.active?1:0,v.available?1:0,v.id).run();
    await audit(access.userId,op,'menu',v.id);return response({ok:true});
   }
@@ -351,7 +402,7 @@ export async function POST(req:Request){
    const v=parse(data,z.object({id,status:z.enum(['approved','rejected']),note:z.string().max(500).default('')}));
    const tr=await db().prepare('SELECT t.*,a.school_id FROM fushati_transfers t JOIN fushati_accounts a ON a.id=t.account_id WHERE t.id=?').bind(v.id).first<any>();
    if(!tr)return err('الحوالة غير موجودة',404);
-   const cafe=await permittedCafeteria(access,tr.cafeteria_id,true);if(!cafe)return err('المقصف غير مصرح',403);
+   const cafe=await permittedCafeteria(access,tr.cafeteria_id,true,'transfers_review');if(!cafe)return err('المقصف غير مصرح',403);
    const reviewed=now();
    const result=await db().batch([
     db().prepare("UPDATE fushati_transfers SET status=?,review_note=?,reviewed_by=?,reviewed_at=? WHERE id=? AND status='pending'").bind(v.status,v.note,access.userId,reviewed,v.id),

@@ -191,10 +191,20 @@ export async function createHarness() {
 
   // Cafeteria (Fushati) accounts: an administrator and an agent identified by mobile number.
   const addFushati = (id, email, role, identifier) => DB.prepare('INSERT INTO fushati_users(id,email,full_name,role,password_hash,active,must_change_password,session_version,created_at,login_identifier,activated_at) VALUES(?,?,?,?,?,1,0,1,?,?,?)').bind(id, email, `Account ${id}`, role, passwordHash, now, identifier, now).run();
-  await addFushati('fushati-admin-1', 'fushati-admin@example.com', 'fushati_admin', '');
-  await addFushati('fushati-agent-1', 'fushati-agent@example.com', 'fushati_agent', 'phone:+966512345678');
+  // UUID ids: the cafeteria route only accepts those when a request names a user.
+  const fushatiIds = Object.fromEntries(['admin1', 'admin2', 'admin3', 'agent1', 'agent2'].map((name, index) => [name, `f0000000-0000-4000-8000-00000000000${index + 1}`]));
+  await addFushati(fushatiIds.admin1, 'fushati-admin@example.com', 'fushati_admin', '');
+  await addFushati(fushatiIds.agent1, 'fushati-agent@example.com', 'fushati_agent', 'phone:+966512345678');
   sessions.fushatiAdmin = await login('/fushati-admin-login', {email: 'fushati-admin@example.com', password: PASSWORD});
   sessions.fushatiAgent = await login('/fushati-agent-login', {identifier: '0512345678', password: PASSWORD});
+  // More accounts for the cafeteria access tests. Cafeteria access is by assignment, so none of them
+  // can reach any cafeteria until a test assigns one.
+  await addFushati(fushatiIds.admin2, 'fushati-admin-2@example.com', 'fushati_admin', '');
+  await addFushati(fushatiIds.admin3, 'fushati-admin-3@example.com', 'fushati_admin', '');
+  await addFushati(fushatiIds.agent2, 'fushati-agent-2@example.com', 'fushati_agent', 'phone:+966512345679');
+  sessions.fushatiAdmin2 = await login('/fushati-admin-login', {email: 'fushati-admin-2@example.com', password: PASSWORD});
+  sessions.fushatiAdmin3 = await login('/fushati-admin-login', {email: 'fushati-admin-3@example.com', password: PASSWORD});
+  sessions.fushatiAgent2 = await login('/fushati-agent-login', {identifier: '0512345679', password: PASSWORD});
 
   /** Only the gateway: does this request get through, and if not, how is it refused? */
   async function gate(cookie, pathname, {method = 'GET', headers = {}} = {}) {
@@ -220,7 +230,7 @@ export async function createHarness() {
   }
 
   return {
-    DB, env, tenancy, schools: SCHOOLS, schoolByKey, sessions, seeded, sharedChildren, phones, serve, gate, tables,
+    DB, env, tenancy, schools: SCHOOLS, schoolByKey, sessions, seeded, sharedChildren, phones, serve, gate, tables, fushatiIds, addFushati, login,
     async close() { await mf.dispose(); },
   };
 }

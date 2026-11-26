@@ -3,6 +3,7 @@ import {tableName} from '../school-sql';
 import {parentPhone} from '../parent-view';
 import {parentLinkedSchools} from '../parent-identities';
 import type {SchoolRole} from '../school-tenancy';
+import {allPermissions,grantAllows,parsePermissions,type CafeteriaGrant,type FushatiPermission} from './permissions';
 
 export type FushatiAccess={role:SchoolRole;schoolId:string;parentPhone:string;userId:string};
 export const response=(data:unknown,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'}});
@@ -23,13 +24,41 @@ export const moneySar=(minor:number)=>Number((minor/100).toFixed(2));
 export const db=()=>env.DB!;
 export const isCafeAdmin=(access:FushatiAccess)=>access.role==='main_admin'||access.role==='fushati_admin';
 export const isCafeStaff=(access:FushatiAccess)=>isCafeAdmin(access)||access.role==='fushati_agent';
-export async function permittedCafeteria(access:FushatiAccess,cafeteriaId:string,includeInactive=false){
+/**
+ * Every cafeteria this user may reach, with what they may do there.
+ * The system administrator reaches all of them. A cafeteria administrator or an agent reaches only the
+ * cafeterias assigned to him (and only while the school is active); an agent is limited to the
+ * permissions granted on that assignment.
+ */
+export async function cafeteriaGrants(access:{role:string;userId:string}):Promise<Map<string,CafeteriaGrant>> {
+ const grants=new Map<string,CafeteriaGrant>();
+ if(access.role==='main_admin'){
+  const rows=(await db().prepare('SELECT c.id FROM fushati_cafeterias c JOIN khotwa_schools s ON s.id=c.school_id WHERE s.active=1').all<{id:string}>()).results;
+  for(const row of rows)grants.set(row.id,{cafeteriaId:row.id,level:'platform',permissions:allPermissions()});
+  return grants;
+ }
+ if(access.role!=='fushati_admin'&&access.role!=='fushati_agent')return grants;
+ const rows=(await db().prepare('SELECT c.id,a.permissions FROM fushati_cafeterias c JOIN khotwa_schools s ON s.id=c.school_id AND s.active=1 JOIN fushati_assignments a ON a.cafeteria_id=c.id WHERE a.user_id=?').bind(access.userId).all<{id:string;permissions:string}>()).results;
+ for(const row of rows){
+  grants.set(row.id,access.role==='fushati_admin'
+   ?{cafeteriaId:row.id,level:'admin',permissions:allPermissions()}
+   :{cafeteriaId:row.id,level:'staff',permissions:new Set(parsePermissions(row.permissions))});
+ }
+ return grants;
+}
+/**
+ * One cafeteria, if this user may do `permission` there. Returns null otherwise (also when it does not exist),
+ * so a caller cannot tell "not yours" from "not found".
+ * Agents only ever reach active cafeterias; administrators may also reach disabled ones with includeInactive.
+ */
+export async function permittedCafeteria(access:FushatiAccess,cafeteriaId:string,includeInactive=false,permission:FushatiPermission='pos'){
  if(!isCafeStaff(access))return null;
- const query=access.role==='fushati_agent'
-  ?'SELECT c.* FROM fushati_cafeterias c JOIN khotwa_schools s ON s.id=c.school_id AND s.active=1 JOIN fushati_assignments a ON a.cafeteria_id=c.id WHERE c.id=? AND c.active=1 AND a.user_id=?'
-  :`SELECT c.* FROM fushati_cafeterias c JOIN khotwa_schools s ON s.id=c.school_id WHERE c.id=? AND s.active=1 ${includeInactive?'':'AND c.active=1'}`;
- const row=await db().prepare(query).bind(...(access.role==='fushati_agent'?[cafeteriaId,access.userId]:[cafeteriaId])).first<any>();
- return row||null;
+ const grant=(await cafeteriaGrants(access)).get(cafeteriaId);
+ if(!grantAllows(grant,permission))return null;
+ const row=await db().prepare('SELECT c.*,s.name AS school_name FROM fushati_cafeterias c JOIN khotwa_schools s ON s.id=c.school_id WHERE c.id=?').bind(cafeteriaId).first<any>();
+ if(!row)return null;
+ if(access.role==='fushati_agent'||!includeInactive){if(!row.active)return null;}
+ return row;
 }
 export async function permittedStudent(phone:string,schoolId:string,studentId:string){
  const canonical=parentPhone(phone);

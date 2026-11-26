@@ -2,7 +2,7 @@ import {env} from 'cloudflare:workers';
 import {z} from 'zod';
 import {getKhotwaAccess,getChatGPTUser} from '../../../chatgpt-auth';
 import {trustedBrowserOrigin} from '../../../../lib/request-origin';
-import {db,response,now,moneyMinor,permittedStudent,isCafeAdmin,getOrCreateAccount} from '../../../../lib/fushati/core';
+import {db,response,now,moneyMinor,permittedStudent,permittedCafeteria,getOrCreateAccount} from '../../../../lib/fushati/core';
 export const dynamic='force-dynamic';
 const MAX_BYTES=4*1024*1024;
 const store=()=>((env as unknown as {BUCKET?:R2Bucket}).BUCKET);
@@ -41,12 +41,14 @@ export async function POST(req:Request){
  }catch(e){if(key)try{await store()?.delete(key)}catch{};if(/UNIQUE constraint/.test(String(e)))return response({error:'مرجع الحوالة مسجل سابقاً لهذا الحساب البنكي'},409);console.error('fushati_receipt_upload_failed',e instanceof Error?e.name:'unknown');return response({error:'تعذر حفظ الإيصال. تحقق من رقم المرجع أو الملف ثم أعد المحاولة.'},503);}
 }
 export async function GET(req:Request){
- const access=await getKhotwaAccess();if(!access||!await getChatGPTUser())return response({error:'يرجى تسجيل الدخول'},401);
+ const access=await getKhotwaAccess(),user=await getChatGPTUser();if(!access||!user)return response({error:'يرجى تسجيل الدخول'},401);
  const id=new URL(req.url).searchParams.get('id');if(!z.string().uuid().safeParse(id).success)return response({error:'الإيصال غير موجود'},404);
  try{
   const row=await db().prepare('SELECT cafeteria_id,parent_phone,receipt_key,receipt_mime FROM fushati_transfers WHERE id=?').bind(id).first<any>();
   if(!row)return response({error:'الإيصال غير موجود'},404);
-  if(!isCafeAdmin({...access,userId:''})&&!(access.role==='parent'&&row.parent_phone===access.parentPhone))return response({error:'غير مصرح'},403);
+  // The parent who sent it, or cafeteria staff who may review transfers in that very cafeteria (never another cafeteria's).
+  const own=access.role==='parent'&&row.parent_phone===access.parentPhone;
+  if(!own&&!await permittedCafeteria({...access,userId:user.userId},row.cafeteria_id,true,'transfers_review'))return response({error:'غير مصرح'},403);
   const object=await store()?.get(row.receipt_key);if(!object)return response({error:'ملف الإيصال غير متاح'},404);
   return new Response(object.body,{headers:{'Cache-Control':'private, no-store','Content-Type':row.receipt_mime,'Content-Disposition':`attachment; filename="fushati-receipt-${id}.${row.receipt_mime==='application/pdf'?'pdf':'img'}"`,'X-Content-Type-Options':'nosniff','Content-Security-Policy':"sandbox; default-src 'none'"}});
  }catch{return response({error:'تعذر تحميل الإيصال'},503);}
