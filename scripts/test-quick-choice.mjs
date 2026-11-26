@@ -1,6 +1,6 @@
 import fs from 'node:fs';import path from 'node:path';import assert from 'node:assert/strict';import {createRequire} from 'node:module';
-const require=createRequire(import.meta.url),ts=require('typescript'),react=require('react');let fieldId=0;
-function load(file){file=path.resolve(file);const exports={};new Function('require','exports',ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText)(name=>name==='react'?{...react,useId:()=>':field-'+(++fieldId)+':'}:name.startsWith('.')?load(path.resolve(path.dirname(file),name)+'.ts'):require(name),exports);return exports;}
+const require=createRequire(import.meta.url),ts=require('typescript'),react=require('react');let fieldId=0;const localeContext={ui:text=>text,language:'ar'};
+function load(file){file=path.resolve(file);const exports={};new Function('require','exports',ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText)(name=>name==='react'?{...react,useId:()=>':field-'+(++fieldId)+':',useContext:()=>localeContext}:name.startsWith('.')?load(path.resolve(path.dirname(file),name)+(fs.existsSync(path.resolve(path.dirname(file),name)+'.ts')?'.ts':'.tsx')):require(name),exports);return exports;}
 const Choice=load('app/quick-choice-field.tsx').default,fields=load('lib/case-fields.ts');
 function walk(node,out=[]){if(!node||typeof node!=='object')return out;if(Array.isArray(node)){for(const x of node)walk(x,out);return out;}out.push(node);walk(node.props?.children,out);return out;}
 for(const choices of [fields.LEAVE_REASONS,fields.RELATIONSHIPS,fields.VIOLATIONS,fields.BEHAVIOR_ACTIONS]){
