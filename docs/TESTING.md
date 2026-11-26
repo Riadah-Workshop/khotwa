@@ -47,7 +47,7 @@ cannot block unrelated work while still being visible.
 Each school has its own physical tables (`tenant_<id>_students`, ...) and the SQL
 is rewritten per request, so the main risks are a statement that skips the
 rewriting, a request that runs under the wrong school, and a role that can reach
-a route it should not. Five tests guard these. All run in `pnpm test` and so in
+a route it should not. Six tests guard these. All run in `pnpm test` and so in
 CI; make the Tests job a required check so none of them can be bypassed.
 
 | Test | Layer | What it proves |
@@ -56,7 +56,8 @@ CI; make the Tests job a required check so none of them can be bypassed.
 | `test-tenancy-source-scan.mjs` | the code | Scans `app/`, `lib/`, `db/`, `build/`. Fails on a raw database statement naming a school table, on `runWithSchool`, table-name builders or a school id read from the request in a file that is not on the reviewed list. Also fails on an exception that is no longer needed. |
 | `test-cross-school-routes.mjs` | the request path | Three schools (the legacy `default` one and two provisioned) with a marked row in every table. Real sign-in, real gateway, real school context, real route handlers, on an in-memory D1 database (Miniflare). Every school reads every school-data route in several orders, so a route that caches the first school's data fails. Also parents linked to one or two schools, forged `oai-authenticated-user-*` headers, an administrator switching schools, and the manager overview. |
 | `test-role-matrix.mjs` | the gateway | Every `app/api/**/route.ts` is classified in a policy table at the top of the test. For every role (anonymous, system administrator, Student Affairs Agent of the default and another school, manager, parent, cafeteria administrator and agent) the gateway must let the request through or refuse it exactly as the table says, for GET and POST. A new route that is not in the table fails the test, so adding a route forces a decision about who may reach it. |
-| `test-cross-cafeteria-routes.mjs` | the cafeteria module | Cafeteria (`fushati_*`) data is in shared tables and scoped in application code, so the SQL rewriting does not cover it. Checks that an agent sees and changes only their assigned cafeteria (and can only propose menu items), administration is closed to agents, parents reach only their own children's cafeterias, and a manager sees only their school's summary. The cafeteria administrator is deliberately platform-wide; the test records that. |
+| `test-cross-cafeteria-routes.mjs` | the cafeteria module | Cafeteria (`fushati_*`) data is in shared tables and scoped in application code, so the SQL rewriting does not cover it. Checks that an agent sees and changes only their assigned cafeteria (and can only propose menu items), administration is closed to agents, parents reach only their own children's cafeterias, and a manager sees only their school's summary. |
+| `test-cafeteria-access-model.mjs` | the cafeteria module | Who may see and change which cafeteria (see `docs/CAFETERIA-ACCESS.md`): a cafeteria administrator reaches only the cafeterias assigned to him, may set an alias but not rename, re-bank, disable, delete or create a cafeteria, manages only the agents of his cafeterias (for an agent who also works elsewhere, only the assignment and permissions in his own), and grants permissions per cafeteria. Also checks menu, stock, transfers, balances, export and receipts per permission, and that every refused action left the other cafeteria's data unchanged. Mutation-checked with six planted leaks. |
 
 The tests that use the full request path share `scripts/support/school-harness.mjs`
 (the runner ignores `scripts/support/`). It builds the schools, accounts and
