@@ -1972,3 +1972,11 @@ export const UI_EN:Record<string,string>={
 };
 
 Object.assign(UI_EN,{'بداية الحصة الأولى':'First lesson starts','مدة التأخر بالدقائق':'Late minutes'});
+
+// Three-dot menus, the slimmer agent header and the work-first home page.
+Object.assign(UI_EN,{
+ 'نعم، احذف':'Yes, delete','المزيد من الإجراءات':'More actions','إجراءات الرد المحفوظ':'Saved reply actions','إجراءات التحسين':'Improvement actions',
+ 'حذف إجراء التحسين هذا؟':'Delete this improvement action?','القائمة':'Menu','ملخص يومك':'Your day at a glance',
+ 'ما يحتاج انتباهك الآن، وأسرع طريق لما تفعله كل يوم.':'What needs your attention now, and the quickest way to what you do every day.',
+ 'لا توجد حالات تنتظر المتابعة.':'No cases are waiting for follow-up.','إدارة المدارس':'Manage schools','خروج':'Sign out',
+});
