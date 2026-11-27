@@ -8,6 +8,7 @@
 .admin-item{display:grid;gap:12px;align-content:start;padding:16px;border-radius:16px;border:1px solid var(--kx-border);border-block-start:4px solid var(--t-solid);background:#fff}
 .admin-item-head{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
 .admin-item-head>div{min-width:0;flex:1}
+.admin-item-head .am-trigger{margin-inline-start:auto}
 .admin-item-head strong{display:block;font-size:16px;line-height:1.3}
 .admin-item-head small{display:block;color:var(--kx-muted);font-size:13px}
 .admin-facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:0}

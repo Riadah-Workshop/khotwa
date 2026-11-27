@@ -1,0 +1,55 @@
+/*
+ * The three-dot menu (app/ui/action-menu.tsx). Not scoped under .kx-scope: the list is drawn into <body>, outside every
+ * screen, so it carries its own colours. Every text/background pair here is checked by scripts/test-action-menu.mjs.
+ */
+.am-trigger{display:inline-grid;place-items:center;flex:none;inline-size:40px;block-size:40px;padding:0;border:1px solid #d3dcd7;border-radius:12px;background:#fff;color:#35514a;cursor:pointer;line-height:1;transition:background-color .15s,border-color .15s,box-shadow .15s}
+.am-trigger.is-small{inline-size:34px;block-size:34px;border-radius:10px}
+.am-trigger:hover:not(:disabled){background:#eef5f1;border-color:#a9c4b8}
+.am-trigger[aria-expanded="true"]{background:#e1eee7;border-color:#7fa896;box-shadow:0 0 0 3px #d3e6dc}
+.am-trigger:focus-visible{outline:3px solid #1d6fd6;outline-offset:2px}
+.am-trigger:disabled{opacity:.5;cursor:not-allowed}
+.am-trigger svg{display:block}
+
+.am-menu{position:fixed;top:0;left:0;right:auto;bottom:auto;z-index:3000;box-sizing:border-box;min-inline-size:210px;max-inline-size:min(330px,calc(100vw - 16px));overflow:auto;padding:6px;background:#fff;color:#17332b;border:1px solid #d3dcd7;border-radius:14px;box-shadow:0 14px 34px rgba(16,40,32,.2),0 2px 6px rgba(16,40,32,.1);font-family:inherit;font-size:14.5px;line-height:1.5;animation:am-in .12s ease-out}
+.am-menu *{box-sizing:border-box}
+@keyframes am-in{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+.am-row{display:block}
+.am-sep{block-size:1px;margin:5px 4px;background:#e3e9e6}
+.am-item{display:flex;align-items:center;gap:10px;inline-size:100%;min-block-size:44px;padding:8px 12px;border:0;border-radius:10px;background:transparent;color:#17332b;font:inherit;text-align:start;text-decoration:none;cursor:pointer}
+.am-item svg{flex:none;inline-size:18px;block-size:18px;color:#4f6159}
+.am-item:hover:not(:disabled),.am-item:focus-visible{background:#eaf3ee}
+.am-item:focus-visible{outline:3px solid #1d6fd6;outline-offset:-3px}
+.am-item:disabled{opacity:.5;cursor:not-allowed}
+.am-item[data-tone="red"]{color:#9b1c1c}
+.am-item[data-tone="red"] svg{color:#9b1c1c}
+.am-item[data-tone="red"]:hover:not(:disabled),.am-item[data-tone="red"]:focus-visible{background:#fde8e8}
+.am-item[data-tone="amber"]{color:#7a4800}
+.am-item[data-tone="amber"] svg{color:#7a4800}
+.am-item[data-tone="amber"]:hover:not(:disabled){background:#fdf0d8}
+.am-item[data-tone="blue"]{color:#1c4a8c}
+.am-item[data-tone="blue"] svg{color:#1c4a8c}
+.am-item[data-tone="blue"]:hover:not(:disabled){background:#e5eefb}
+
+/* The question after a row that asks first ("Delete this?"), in the same place as the list. */
+.am-ask{display:grid;gap:10px;padding:8px 6px 6px}
+.am-ask p{margin:0;font-size:14px;line-height:1.7;color:#17332b}
+.am-ask code{padding:1px 6px;border-radius:6px;background:#edf0f3;color:#394655;font-size:13px;unicode-bidi:isolate}
+.am-input{inline-size:100%;min-block-size:42px;padding:8px 10px;border:1px solid #b9c5be;border-radius:10px;background:#fff;color:#17332b;font:inherit}
+.am-input:focus-visible{outline:3px solid #1d6fd6;outline-offset:1px}
+.am-ask-buttons{display:flex;gap:8px;flex-wrap:wrap}
+.am-yes,.am-no{flex:1 1 90px;min-block-size:44px;padding:8px 12px;border-radius:10px;font:inherit;font-weight:700;cursor:pointer;border:1px solid transparent}
+.am-yes{background:#c53030;border-color:#c53030;color:#fff}
+.am-yes[data-tone="amber"]{background:#a95a05;border-color:#a95a05}
+.am-yes[data-tone="blue"]{background:#2563a8;border-color:#2563a8}
+.am-yes[data-tone="green"]{background:#13775a;border-color:#13775a}
+.am-yes[data-tone="slate"]{background:#475569;border-color:#475569}
+.am-yes:disabled{opacity:.45;cursor:not-allowed}
+.am-no{background:#fff;border-color:#b9c5be;color:#17332b}
+.am-yes:focus-visible,.am-no:focus-visible{outline:3px solid #1d6fd6;outline-offset:2px}
+
+@media(max-width:560px){
+ .am-menu{min-inline-size:min(260px,calc(100vw - 16px))}
+ .am-item{min-block-size:48px;font-size:15px}
+}
+@media(prefers-reduced-motion:reduce){.am-menu{animation:none}.am-trigger{transition:none}}
+@media print{.am-trigger,.am-menu{display:none!important}}

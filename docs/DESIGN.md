@@ -86,9 +86,49 @@ Nothing that adds or changes a record opens a popup. The kit has two pieces for 
   draft?"): a bar at the top of the page with Yes and No, No focused. It replaces `confirm()`.
 
 So: *add or change* = an `EditorView` or a sheet (enter, save, leave); *confirm* = a `ConfirmButton` or `useAsk`; *type to
-confirm* = `TypeToConfirm`; *a reason to type* (rejecting a transfer) = a field that opens in the row. The browser's
+confirm* = `TypeToConfirm`; *an action on one row of a list* = a row of the three-dot menu (below), which asks inside the menu when it cannot be undone; *a reason to type* (rejecting a transfer) = a field that opens in the row. The browser's
 `confirm()`, `prompt()` and `alert()` are not used. Print previews and the guided tour are not editing and keep their own
 layers.
+
+## Row actions: the three-dot menu
+
+Edit, delete, archive, disable, reset a password, print and the other things you can do to **one row** of a list are not
+a row of buttons. The row shows a three-dot button (`ActionMenu`, `app/ui/action-menu.tsx`); pressing it opens a short list
+next to it, and pressing a row of the list does it.
+
+- Only the one or two things the person does all the time stay visible in the row (for a case: View, Follow up, WhatsApp).
+  Edit and Delete always go in the menu, with the less common actions.
+- The list is drawn into `<body>`, so a card or a table cannot cut it off. It opens below the button, or above if there is
+  no room, takes the page's direction (Arabic or English) from its button, and closes on Escape, on a press elsewhere, or
+  when the page scrolls. On a phone its rows are 48 px tall.
+- Keyboard: Enter/Space or the arrow keys open it, the arrows move, Home/End jump, Enter picks, Escape closes and returns to the button.
+  The button always has a label that names the row ("Actions: Sara Abdullah").
+- A row that cannot be undone has `confirm: {message, yes, no}`: choosing it turns the list into the question with Yes /
+  No (No focused). Add `expected` to make the person type a word again first (a school code, an email); Yes stays
+  disabled until it matches. There is no popup and nothing leaves the menu.
+- If every row is hidden (for example the person may not edit), no button is drawn.
+- Rows that open a page (Edit) just call the function that opens it; the menu closes and focus goes to the page.
+- The pure parts (where the list goes, how the keys move) are in `action-menu-logic.ts` and tested by `scripts/test-action-menu.mjs`.
+
+Not for a detail page's own footer (a Save button) or for the single main button of a screen: those stay buttons.
+
+## The Student Affairs agent's frame
+
+`app/ui/agent-shell.css` restyles the frame of the agent workspace (header, side menu, section tabs, page heading, home
+page). It is loaded after every older stylesheet, wrapped in `@media screen` (printing is unchanged), and every selector
+starts from `.app-shell`, which only the agent dashboard has, so no other screen can change. `scripts/test-agent-layout.mjs` checks all three.
+
+- **The work starts at the top.** The header is one slim row: school and ministry logos, a small date-and-time pill (the
+  dial and the labels are gone), then the tools. The older frame used 260 px (desktop) and about 700 px (phone) before
+  the first line of work.
+- **Section tabs are one strip**, sticky under the header on a desktop screen and scrolling sideways on a phone, with the
+  "register a late arrival / leave / contact" shortcuts as pills at the end of the strip.
+- **Phone:** the side block is gone (the bottom bar is the menu), and the tools (settings, refresh, tour, language,
+  sign out, manage schools) are in a three-dot menu in the header.
+- **Home** opens with the three daily shortcuts, four counts that are buttons into their lists, then "needs
+  follow-up" (the first five open cases with a Follow-up button) next to the latest cases. The decorative banner is gone.
+- **Tables** that carry `data-khotwa-table` are white rows with fine lines, not a different colour in every column.
+- Text sizes follow the agent's text-size setting (`--workspace-font-scale`).
 
 ## Adding a screen or a step
 

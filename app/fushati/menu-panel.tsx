@@ -5,6 +5,7 @@ import {Barcode, Camera, Check, PackagePlus, Pencil, Plus, ScanBarcode, Search, 
 import '../ui/kx.css';
 import './panels.css';
 import {Badge, Card, ConfirmButton, Empty, EditorView, Notice, cx} from '../ui/kx';
+import {ActionMenu} from '../ui/action-menu';
 import type {Tone} from '../ui/kx';
 import {FUSHATI_CATEGORIES, categoryEnglish} from '../../lib/fushati/categories';
 import {barcodeMessage, barcodeProblem, normalizeBarcode} from '../../lib/fushati/barcode';
@@ -97,11 +98,11 @@ export default function MenuPanel({mode, language, cafeteriaId, items, canManage
     }
   }
 
-  async function remove() {
-    if (!editing?.id || saving) return;
+  async function remove(id: string | undefined = editing?.id) {
+    if (!id || saving) return;
     setSaving(true); setError('');
     try {
-      await send('delete-menu', {id: editing.id});
+      await send('delete-menu', {id});
       closeEditor();
       onSaved(t('تم حذف المنتج', 'Product deleted'));
     } catch (failure) {
@@ -194,14 +195,21 @@ export default function MenuPanel({mode, language, cafeteriaId, items, canManage
             return <article key={row.id} className="cfm-item" data-state={state}>
               <header>
                 <div><strong>{row.name}</strong><small>{en ? categoryEnglish(row.category) : row.category}</small></div>
-                <Badge tone={STATE[state].tone}>{en ? STATE[state].en : STATE[state].ar}</Badge>
+                <div className="cfm-head-end">
+                  <Badge tone={STATE[state].tone}>{en ? STATE[state].en : STATE[state].ar}</Badge>
+                  <ActionMenu small label={t('إجراءات', 'Actions') + ': ' + row.name} actions={[
+                    {label: state === 'pending' && row.price_minor === 0 ? t('تسعير واعتماد', 'Price and approve') : t('تعديل', 'Edit'), icon: <Pencil size={18} aria-hidden="true"/>, hidden: !canManage, onSelect: () => openEdit(row)},
+                    {label: t('حذف المنتج', 'Delete product'), icon: <Trash2 size={18} aria-hidden="true"/>, tone: 'red', separatorBefore: true, hidden: !canManage, disabled: saving,
+                      confirm: {message: t('حذف هذا المنتج نهائياً؟ لا يُحذف منتج سبق بيعه.', 'Delete this product for good? A product that was already sold cannot be deleted.'), yes: t('نعم، احذف', 'Yes, delete'), no: t('لا', 'No')}, onSelect: () => { void remove(row.id); }},
+                  ]}/>
+                </div>
               </header>
               <dl className="cfm-facts">
                 <div><dt>{t('السعر', 'Price')}</dt><dd>{row.price_minor > 0 ? `${money(row.price_minor)} SAR` : t('لم يُحدد', 'Not set')}</dd></div>
                 <div className="cfm-code"><dt>{t('الباركود', 'Barcode')}</dt><dd dir="ltr">{row.barcode ? <><Barcode size={13} aria-hidden="true"/> {row.barcode}</> : '—'}</dd></div>
                 {canViewStock && <div><dt>{t('المتوفر', 'In stock')}</dt><dd>{row.stock_tracked ? row.stock_qty : '—'}</dd></div>}
               </dl>
-              {canManage && <footer><button type="button" className="kx-btn is-small" onClick={() => openEdit(row)}><Pencil size={15} aria-hidden="true"/>{state === 'pending' && row.price_minor === 0 ? t('تسعير واعتماد', 'Price and approve') : t('تعديل', 'Edit')}</button></footer>}
+              {canManage && state === 'pending' && row.price_minor === 0 && <footer><button type="button" className="kx-btn is-small is-solid" onClick={() => openEdit(row)}><Pencil size={15} aria-hidden="true"/>{t('تسعير واعتماد', 'Price and approve')}</button></footer>}
             </article>;
           })}
         </div>}

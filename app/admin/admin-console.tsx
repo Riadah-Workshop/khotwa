@@ -7,7 +7,8 @@ import {SAUDI_REGIONS, saudiRegion, saudiCity} from '../../lib/saudi-locations';
 import {SCHOOL_STAGES} from '../../lib/school-stages';
 import '../ui/kx.css';
 import './admin.css';
-import {Badge, Card, Chip, ConfirmButton, EditorView, Empty, Notice, PageHead, Stat, TabPanel, Tabs, TypeToConfirm} from '../ui/kx';
+import {Badge, Card, Chip, EditorView, Empty, Notice, PageHead, Stat, TabPanel, Tabs, TypeToConfirm} from '../ui/kx';
+import {ActionMenu} from '../ui/action-menu';
 import type {Tone} from '../ui/kx';
 import {GuidedTour, TourHelpButton, useTour} from '../ui/tour';
 
@@ -237,7 +238,13 @@ export default function AdminConsole({activeSchoolId, tourKey}: {activeSchoolId:
           {legacyStudents > 0 && <Notice tone="blue" icon={<Archive size={18}/>}>{t(`يوجد ${legacyStudents} طالبًا في بيانات MAIN القديمة. لم تُحذف هذه البيانات حفاظًا عليها.`, `${legacyStudents} students remain in legacy MAIN data. This data has been preserved.`)} <button type="button" className="kx-btn is-small" data-tone="blue" onClick={() => switchSchool('default')} disabled={busy}><DoorOpen size={15}/>{t('فتح البيانات القديمة', 'Open legacy data')}</button></Notice>}
           {schools.length === 0 ? <Empty icon={<Building2 size={24}/>}>{t('لا توجد مدارس بعد. أنشئ أول مدرسة من النموذج أدناه.', 'No schools yet. Create the first one with the form below.')}</Empty>
             : <div className="admin-cards">{schools.map(s => <article key={s.id} className="admin-item" data-tone={s.active ? 'green' : 'slate'}>
-              <div className="admin-item-head"><Chip tone={s.active ? 'green' : 'slate'} icon={<SchoolIcon size={20}/>}/><div><strong>{s.name}</strong><small dir="ltr">{s.code}</small></div></div>
+              <div className="admin-item-head"><Chip tone={s.active ? 'green' : 'slate'} icon={<SchoolIcon size={20}/>}/><div><strong>{s.name}</strong><small dir="ltr">{s.code}</small></div>
+                <ActionMenu label={t('إجراءات', 'Actions') + ': ' + s.name} actions={[
+                  {label: t('تعديل / إعادة تسمية', 'Edit / rename'), icon: <Pencil size={18}/>, disabled: busy, onSelect: () => { setEditingSchool(s); setSection('schools'); }},
+                  {label: t('حذف نهائي', 'Delete permanently'), icon: <Trash2 size={18}/>, tone: 'red', separatorBefore: true, disabled: busy,
+                    confirm: {message: t('حذف نهائي للمدرسة وجميع بياناتها ومرفقاتها وحساباتها! لا يمكن التراجع، فاحتفظ بنسخة احتياطية. اكتب رمز المدرسة للتأكيد:', 'PERMANENTLY delete the school, its data, attachments and accounts! This cannot be undone, so back up first. Type the school code to confirm:'), yes: t('احذف نهائياً', 'Delete for good'), no: cancelText, expected: s.code},
+                    onSelect: () => { void save('delete-school', {schoolId: s.id, confirmCode: s.code}); }},
+                ]}/></div>
               <div className="admin-steps"><Badge tone={s.active ? 'green' : 'slate'}>{s.active ? t('نشطة', 'Active') : t('موقوفة', 'Disabled')}</Badge>{activeSchoolId === s.id && <Badge tone="violet">{t('المدرسة المفتوحة', 'Currently opened')}</Badge>}</div>
               <dl className="admin-facts">
                 <div><dt>{t('المنطقة والمدينة', 'Province / City')}</dt><dd>{regionName(s.region)} / {cityName(s.region, s.city)}</dd></div>
@@ -247,10 +254,6 @@ export default function AdminConsole({activeSchoolId, tourKey}: {activeSchoolId:
               </dl>
               <div className="kx-btn-row">
                 <button type="button" className="kx-btn is-solid is-small" data-tone="green" disabled={busy || !s.active} onClick={() => switchSchool(s.id)}><DoorOpen size={16}/>{t('فتح', 'Open')}</button>
-                <button type="button" className="kx-btn is-small" data-tone="blue" disabled={busy} onClick={() => { setEditingSchool(s); setSection('schools'); }}><Pencil size={16}/>{t('تعديل / إعادة تسمية', 'Edit / rename')}</button>
-                <TypeToConfirm label={t('حذف نهائي', 'Delete permanently')} icon={<Trash2 size={16}/>} disabled={busy} expected={s.code}
-                  message={t('حذف نهائي للمدرسة وجميع بياناتها ومرفقاتها وحساباتها! لا يمكن التراجع، فاحتفظ بنسخة احتياطية. اكتب رمز المدرسة للتأكيد:', 'PERMANENTLY delete the school, its data, attachments and accounts! This cannot be undone, so back up first. Type the school code to confirm:')}
-                  confirmLabel={t('احذف نهائياً', 'Delete for good')} cancelLabel={cancelText} onConfirm={() => { void save('delete-school', {schoolId: s.id, confirmCode: s.code}); }}/>
               </div>
             </article>)}</div>}
         </Card>
@@ -266,7 +269,16 @@ export default function AdminConsole({activeSchoolId, tourKey}: {activeSchoolId:
         <Card tourId="admin-users" tone="blue" icon={<Users size={18}/>} title={t('الوكلاء ومديرو المدارس', 'Student Affairs Agents & School Managers')} description={t('تصل دعوة تعيين كلمة المرور إلى البريد. تابع الحالة وأول دخول. دور مدير المدرسة للقراءة والتقارير فقط.', 'Users receive an email link to set their own password. Track invitation and first login. School managers can view reports only.')} actions={<button type="button" className="kx-btn is-small" data-tone="blue" onClick={() => load()} disabled={busy}><RefreshCw size={16}/>{t('تحديث حالة الدعوات', 'Refresh invitation status')}</button>}>
           {accounts.length === 0 ? <Empty icon={<Users size={24}/>}>{t('لا توجد حسابات بعد. ادعُ أول مستخدم من النموذج أدناه.', 'No accounts yet. Invite the first user with the form below.')}</Empty>
             : <div className="admin-cards">{accounts.map(u => <article key={u.id} className="admin-item" data-tone={u.active ? 'blue' : 'slate'}>
-              <div className="admin-item-head"><Chip tone={u.role === 'manager' ? 'violet' : 'blue'} icon={u.role === 'manager' ? <ChartColumn size={20}/> : <Users size={20}/>}/><div><strong>{u.full_name}</strong><small>{roleName(u.role)}</small></div></div>
+              <div className="admin-item-head"><Chip tone={u.role === 'manager' ? 'violet' : 'blue'} icon={u.role === 'manager' ? <ChartColumn size={20}/> : <Users size={20}/>}/><div><strong>{u.full_name}</strong><small>{roleName(u.role)}</small></div>
+                <ActionMenu label={t('إجراءات', 'Actions') + ': ' + u.full_name} actions={[
+                  {label: t('تعديل / نقل', 'Edit / move'), icon: <Pencil size={18}/>, disabled: busy, onSelect: () => { setError(''); setMessage(''); setEditingAccount({id: u.id, fullName: u.full_name, schoolId: u.school_id}); }},
+                  {label: u.active ? t('إيقاف', 'Disable') : t('تفعيل', 'Enable'), icon: <Power size={18}/>, tone: u.active ? 'amber' : 'green', disabled: busy, onSelect: () => { void save('edit-account', {id: u.id, schoolId: u.school_id, fullName: u.full_name, active: !u.active}); }},
+                  {label: t('إرسال رابط الدخول', 'Send access link'), icon: <KeyRound size={18}/>, disabled: busy || !u.active,
+                    confirm: {message: t('إرسال رابط آمن لتعيين كلمة المرور؟', 'Send a secure password-set/reset link?'), yes: t('نعم، أرسل', 'Yes, send'), no: t('لا', 'No')}, onSelect: () => { void save('resend-account', {id: u.id}); }},
+                  {label: t('حذف', 'Delete'), icon: <Trash2 size={18}/>, tone: 'red', separatorBefore: true, disabled: busy,
+                    confirm: {message: t('حذف هذا الحساب بشكل نهائي؟ اكتب البريد الإلكتروني للتأكيد:', 'Permanently delete this account? Type the email address to confirm:'), yes: t('احذف نهائياً', 'Delete for good'), no: cancelText, expected: u.email},
+                    onSelect: () => { void save('delete-account', {id: u.id, confirmEmail: u.email}); }},
+                ]}/></div>
               <dl className="admin-facts">
                 <div className="wide"><dt>{t('المدرسة', 'School')}</dt><dd>{schools.find(s => s.id === u.school_id)?.name || '—'}</dd></div>
                 <div className="wide"><dt>{t('البريد', 'Email')}</dt><dd dir="ltr">{u.email}</dd></div>
@@ -286,14 +298,6 @@ export default function AdminConsole({activeSchoolId, tourKey}: {activeSchoolId:
                   <div><dt>{t('أول دخول', 'First login')}</dt><dd>{fmt(u.first_login_at, en)}</dd></div>
                 </dl>
               </details>
-              <div className="kx-btn-row">
-                <button type="button" className="kx-btn is-small" data-tone="blue" disabled={busy} onClick={() => { setError(''); setMessage(''); setEditingAccount({id: u.id, fullName: u.full_name, schoolId: u.school_id}); }}><Pencil size={16}/>{t('تعديل / نقل', 'Edit / move')}</button>
-                <button type="button" className="kx-btn is-small" data-tone={u.active ? 'amber' : 'green'} disabled={busy} onClick={() => save('edit-account', {id: u.id, schoolId: u.school_id, fullName: u.full_name, active: !u.active})}><Power size={16}/>{u.active ? t('إيقاف', 'Disable') : t('تفعيل', 'Enable')}</button>
-                <ConfirmButton tone="teal" label={t('إرسال رابط الدخول', 'Send access link')} icon={<KeyRound size={16}/>} disabled={busy || !u.active} message={t('إرسال رابط آمن لتعيين كلمة المرور؟', 'Send a secure password-set/reset link?')} confirmLabel={t('نعم، أرسل', 'Yes, send')} cancelLabel={t('لا', 'No')} onConfirm={() => { void save('resend-account', {id: u.id}); }}/>
-                <TypeToConfirm label={t('حذف', 'Delete')} icon={<Trash2 size={16}/>} disabled={busy} expected={u.email}
-                  message={t('حذف هذا الحساب بشكل نهائي؟ اكتب البريد الإلكتروني للتأكيد:', 'Permanently delete this account? Type the email address to confirm:')}
-                  confirmLabel={t('احذف نهائياً', 'Delete for good')} cancelLabel={cancelText} onConfirm={() => { void save('delete-account', {id: u.id, confirmEmail: u.email}); }}/>
-              </div>
             </article>)}</div>}
         </Card>
         <Card tourId="admin-invite" tone="green" icon={<UserPlus size={18}/>} title={t('دعوة حساب جديد', 'Invite a new user')} description={t('يصل المستخدم رابط آمن ليعيّن كلمة المرور بنفسه.', 'The user receives a secure link and sets their own password.')}>
@@ -328,9 +332,11 @@ export default function AdminConsole({activeSchoolId, tourKey}: {activeSchoolId:
           {rows.length > 0 && <div className="kx-table-wrap"><table className="kx-table"><thead><tr><th>{t('مفتاح السجل', 'Record key')}</th><th>{t('الوصف', 'Summary')}</th><th>{t('الإجراء', 'Action')}</th></tr></thead><tbody>{rows.map((row, i) => <tr key={i}>
             <td dir="ltr">{String(row[recordKey] ?? '')}</td>
             <td><code className="admin-code">{Object.entries(row).filter(([k]) => k !== recordKey).map(([k, v]) => `${k}: ${String(v ?? '').slice(0, 85)}`).join(' · ').slice(0, 260)}</code></td>
-            <td><TypeToConfirm label={t('حذف', 'Delete')} icon={<Trash2 size={16}/>} disabled={busy} expected={String(row[recordKey] || '')}
-              message={t('للتأكيد اكتب معرّف السجل حرفيًا:', 'Type the exact record key to confirm deletion:')}
-              confirmLabel={t('احذف نهائياً', 'Delete for good')} cancelLabel={cancelText} onConfirm={() => { void save('delete-record', {schoolId: recordSchool, table, key: String(row[recordKey] || '')}).then(ok => { if (ok) void loadRecords(); }); }}/></td>
+            <td><ActionMenu small label={t('إجراءات السجل', 'Record actions') + ': ' + String(row[recordKey] ?? '')} actions={[
+              {label: t('حذف', 'Delete'), icon: <Trash2 size={18}/>, tone: 'red', disabled: busy,
+                confirm: {message: t('للتأكيد اكتب معرّف السجل حرفيًا:', 'Type the exact record key to confirm deletion:'), yes: t('احذف نهائياً', 'Delete for good'), no: cancelText, expected: String(row[recordKey] || '')},
+                onSelect: () => { void save('delete-record', {schoolId: recordSchool, table, key: String(row[recordKey] || '')}).then(ok => { if (ok) void loadRecords(); }); }},
+            ]}/></td>
           </tr>)}</tbody></table></div>}
           {(recordPage > 0 || recordHasMore) && <div className="kx-btn-row"><button type="button" className="kx-btn is-small" disabled={recordPage === 0 || busy} onClick={() => loadRecords(recordPage - 1)}>{t('السابق', 'Previous')}</button><Badge tone="slate">{t('الصفحة', 'Page')} {recordPage + 1}</Badge><button type="button" className="kx-btn is-small" disabled={!recordHasMore || busy} onClick={() => loadRecords(recordPage + 1)}>{t('التالي', 'Next')}</button></div>}
         </Card>

@@ -1,0 +1,174 @@
+/*
+ * Student Affairs agent workspace: the frame around every page (header, side menu, section tabs, page heading) and the
+ * home page. Loaded after every older stylesheet, so it only has to say what is different. Screen only: printing keeps the
+ * rules in globals.css. Text sizes follow the agent's text-size setting through --workspace-font-scale.
+ *
+ * The idea: the work starts at the top of the screen. The older frame spent 260 px (desktop) and 700 px (phone) on logos,
+ * a clock and a second card of tabs before the first line of work; now the header is one slim row, the section tabs are a
+ * single strip, and the clock is a small pill.
+ */
+@media screen{
+ .app-shell{--shell-line:#e4ebe6;--shell-ink:#1f3a2d;--shell-muted:#556b5e;--shell-head:64px}
+
+ /* ---------- Header: one slim row ---------- */
+ .app-shell .workspace .topbar{position:sticky;top:0;z-index:25;display:grid;grid-template-columns:minmax(0,1fr) auto auto;grid-template-areas:"id clock tools";align-items:center;gap:8px 16px;height:auto;min-height:var(--shell-head);padding:8px 28px;background:rgba(255,255,255,.97);border-bottom:1px solid var(--shell-line);box-shadow:0 1px 0 #fff}
+ .app-shell .workspace .topbar>.school-identity{grid-area:id;justify-content:flex-start;flex-wrap:nowrap;width:auto;min-width:0;margin:0;gap:12px}
+ .app-shell .workspace .topbar>.school-identity>div{text-align:start;gap:0}
+ .app-shell .workspace .topbar .school-identity b{font-size:calc(15px * var(--workspace-font-scale,1));line-height:1.5;color:var(--shell-ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ .app-shell .workspace .topbar .school-identity small{display:none}
+ .app-shell .workspace .topbar .school-emblem{width:42px;height:42px;flex:none}
+ .app-shell .workspace .topbar .ministry-emblem{width:82px;max-height:40px;object-fit:contain;flex:none}
+ .app-shell .workspace .topbar .school-identity .national-marks{flex:0 0 auto;padding:0;border:0;gap:12px;margin-inline-start:4px}
+ .app-shell .workspace .topbar .school-identity .national-marks .kingdom-emblem{width:24px;height:27px}
+ .app-shell .workspace .topbar .school-identity .national-marks .vision-emblem{width:54px;height:36px}
+ .app-shell .workspace .topbar>.school-clock{grid-area:clock}
+ .app-shell .workspace .topbar>.top-actions{grid-area:tools}
+ .app-shell .top-actions{gap:8px}
+ .app-shell .top-actions .icon-button,.app-shell .top-actions .settings-access{min-width:40px;min-height:40px}
+ .app-shell .top-actions .settings-access span{display:none}
+ .app-shell .top-actions .user-name{display:none}
+ .app-shell .top-actions .user-avatar{flex:none}
+ .app-shell .top-menu{display:none}
+
+ /* The date and time: a small pill instead of a banner with a dial. */
+ .app-shell .school-clock{display:flex;align-items:center;gap:14px;flex:0 0 auto;width:auto;margin:0;padding:5px 16px;border-radius:999px;background:#f3f8f5;border:1px solid #dbe7df;box-shadow:none;color:var(--shell-ink)}
+ .app-shell .school-clock span,.app-shell .school-clock .luxury-clock-face{display:none}
+ .app-shell .school-clock>div{gap:8px}
+ .app-shell .school-clock>div.school-clock-time{padding:0;border:0;gap:0}
+ .app-shell .school-clock>div.school-clock-hijri{padding:0;border:0}
+ .app-shell .school-clock svg{width:18px;height:18px;color:#3f7a5c}
+ .app-shell .school-clock strong{font-size:calc(14px * var(--workspace-font-scale,1));line-height:1.5;font-weight:700}
+ .app-shell .school-clock time{font-size:calc(13px * var(--workspace-font-scale,1));line-height:1.5;color:var(--shell-muted)}
+ .app-shell .school-clock .school-clock-time time{min-width:0;font-size:calc(14px * var(--workspace-font-scale,1));font-weight:700;color:var(--shell-ink)}
+ .app-shell .school-clock .school-clock-gregorian{padding-inline-start:14px;border-inline-start:1px solid #d2e0d7}
+
+ /* ---------- Side menu ---------- */
+ .app-shell .sidebar{width:232px;padding:18px 14px 14px;background:#fff;border-left:1px solid var(--shell-line)}
+ .app-shell .workspace{margin-right:232px}
+ .app-shell .brand{padding:0 6px;gap:10px;justify-content:flex-start}
+ .app-shell .brand b{font-size:26px;line-height:1.2}
+ .app-shell .brand small{font-size:11px;line-height:1.5}
+ .app-shell .brand-logo{width:46px;height:46px;flex:none}
+ .app-shell .side-divider{margin:14px 6px}
+ .app-shell .all-services-link{margin:0 0 6px;padding:9px 12px;border-radius:11px;font-size:calc(14px * var(--workspace-font-scale,1))}
+ .app-shell .nav-caption{padding:6px 12px 6px;font-size:11px}
+ .app-shell .sidebar>nav{gap:2px}
+ .app-shell .sidebar .nav-item[data-section]{min-height:48px;margin:0;padding:6px 10px;gap:10px;border-radius:12px;border-inline-start:3px solid transparent;font-size:calc(14px * var(--workspace-font-scale,1));color:var(--shell-ink)}
+ .app-shell .sidebar .nav-item[data-section]:hover:not(.active){background:var(--section-soft)}
+ .app-shell .sidebar .nav-item[data-section].active{background:var(--section-soft);border-inline-start-color:var(--section-accent);color:var(--section-accent);font-weight:700}
+ .app-shell .sidebar .nav-item .workspace-icon{width:34px;height:34px}
+ .app-shell .sidebar .nav-item .nav-label{flex:1;text-align:start;line-height:1.4}
+ .app-shell .side-bottom{padding:12px 6px 0}
+ .app-shell .side-bottom p{margin-top:6px;font-size:10px;line-height:1.5}
+ .app-shell .side-bottom .secure{gap:6px;font-size:11px}
+ .app-shell .side-bottom p:not(.author-credit){display:none}
+
+ /* ---------- Work area ---------- */
+ .app-shell main{padding:16px 28px 36px;max-width:1500px}
+
+ /* Section tabs: one strip, the way a desktop application shows them. */
+ .app-shell .section-services{position:sticky;top:var(--shell-head);z-index:20;display:flex;align-items:center;gap:4px 18px;flex-wrap:wrap;margin:0 0 16px;padding:0;background:rgba(255,255,255,.97);border:0;border-bottom:1px solid var(--shell-line);border-radius:0;box-shadow:none}
+ .app-shell .section-services-heading{display:flex;align-items:center;gap:8px;margin:0;flex:none}
+ .app-shell .section-services-heading strong{font-size:calc(15px * var(--workspace-font-scale,1));color:var(--section-accent)}
+ .app-shell .section-services-heading>span{display:none}
+ .app-shell .section-services nav{display:flex;flex:1 1 auto;gap:2px;flex-wrap:nowrap;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:thin;align-items:stretch;min-width:0}
+ .app-shell .section-services nav button{flex:none;min-height:48px;padding:8px 14px;border:0;border-bottom:3px solid transparent;border-radius:0;background:transparent;color:#475f51;font-size:calc(14px * var(--workspace-font-scale,1));white-space:nowrap}
+ .app-shell .section-services nav button:hover:not(.selected):not(:disabled){background:var(--section-soft);border-color:transparent;border-bottom-color:var(--section-soft)}
+ .app-shell .section-services nav button.selected{background:transparent;color:var(--section-accent);border-color:transparent;border-bottom-color:var(--section-accent);font-weight:700}
+ .app-shell .section-services nav button.quick{align-self:center;min-height:38px;margin-inline-start:6px;padding:6px 14px;gap:6px;border:1px solid color-mix(in srgb,var(--section-accent) 35%,white);border-radius:999px;background:var(--section-soft);color:var(--section-accent);font-weight:700}
+ .app-shell .section-services nav button.quick:first-of-type{margin-inline-start:auto}
+ .app-shell .section-services nav button.quick:hover:not(:disabled){background:var(--section-accent);color:#fff;border-color:var(--section-accent)}
+ .app-shell .section-services nav button:focus-visible{outline:3px solid var(--section-accent);outline-offset:-3px}
+
+ /* Page heading: the title and the one main button, nothing else. */
+ .app-shell .page-heading{align-items:flex-end;gap:12px;margin:0 0 14px;padding:0 0 10px;border:0;border-inline-start:0;padding-inline-start:0}
+ .app-shell .page-heading h1{font-size:calc(24px * var(--workspace-font-scale,1));line-height:1.4;letter-spacing:0}
+ .app-shell .page-heading .eyebrow{margin-bottom:2px;font-size:calc(12px * var(--workspace-font-scale,1));color:var(--shell-muted)}
+ .app-shell .page-heading p{margin-top:4px;font-size:calc(13px * var(--workspace-font-scale,1));color:var(--shell-muted)}
+ .app-shell .page-heading .heading-action{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+ .app-shell .page-heading .primary{min-height:44px;border-radius:12px}
+
+ /* ---------- Home ---------- */
+ .app-shell .daily-shortcuts{grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:12px}
+ .app-shell .daily-shortcuts button{min-height:66px;padding:12px 16px;gap:12px;border-radius:14px}
+ .app-shell .daily-shortcuts b{font-size:calc(16px * var(--workspace-font-scale,1))}
+ .app-shell .daily-shortcuts small{font-size:calc(12px * var(--workspace-font-scale,1))}
+ .app-shell .stats.home-stats{grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:0 0 14px}
+ .app-shell .home-stats .stat{display:block;width:100%;padding:13px 16px;border-radius:14px;text-align:start;cursor:pointer;font:inherit;transition:transform .15s,box-shadow .15s}
+ .app-shell .home-stats .stat:hover{transform:translateY(-2px);box-shadow:0 8px 20px #234e3d14}
+ .app-shell .home-stats .stat:focus-visible{outline:3px solid var(--section-accent,#245b40);outline-offset:3px}
+ .app-shell .home-stats .stat>span{font-size:calc(12px * var(--workspace-font-scale,1))}
+ .app-shell .home-stats .stat>b{margin-top:6px;font-size:calc(28px * var(--workspace-font-scale,1));line-height:1.3}
+ .app-shell .home-stats .stat>b small{font-size:calc(12px * var(--workspace-font-scale,1));font-weight:400}
+ .app-shell .home-grid.home-columns{display:grid;grid-template-columns:minmax(300px,.8fr) minmax(0,1.5fr);gap:16px;align-items:start}
+ .app-shell .home-queue .section-head h2{display:flex;align-items:center;gap:8px}
+ .app-shell .queue-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 0;border-top:1px solid #eef2ee}
+ .app-shell .queue-row:first-of-type{border-top:0}
+ .app-shell .queue-row>div{display:grid;min-width:0}
+ .app-shell .queue-row .ghost{flex:none;white-space:nowrap}
+ .app-shell .queue-row small{font-size:calc(12px * var(--workspace-font-scale,1))}
+ .app-shell .queue-empty{display:flex;align-items:center;gap:8px;margin:0;padding:14px;border-radius:12px;background:#eef7f1;color:#1f6a45;font-size:calc(14px * var(--workspace-font-scale,1))}
+
+ .app-shell .home-stats .stat .workspace-icon{width:34px;height:34px}
+ .app-shell .home-stats .stat .workspace-icon>svg{width:18px;height:18px}
+ .app-shell.services-screen .page-heading{display:none}
+
+ /* ---------- Tables: white rows with fine lines instead of a different colour in every column ---------- */
+ .app-shell table[data-khotwa-table]{border-collapse:collapse;border-spacing:0}
+ .app-shell table[data-khotwa-table]>thead>tr>th{padding:10px 12px;border-radius:0;background:#f1f6f3;color:#3c5748;border-bottom:1px solid #dfe8e2;font-size:calc(13px * var(--workspace-font-scale,1));white-space:nowrap}
+ .app-shell table[data-khotwa-table]>tbody>tr>td{padding:10px 12px;border-radius:0;background:#fff;color:var(--shell-ink);box-shadow:none;border-bottom:1px solid #eaf0ec}
+ .app-shell table[data-khotwa-table]>tbody>tr:hover>td{background:#f6faf7}
+
+ /* ---------- Case cards: the main actions in view, the rest behind the three dots ---------- */
+ .app-shell .case-card .case-actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+ .app-shell .case-card .case-actions .am-trigger{margin-inline-start:auto}
+ .app-shell .case-card .case-foot{gap:10px}
+
+ @media(max-width:1500px){
+  .app-shell .school-clock .school-clock-gregorian{display:none}
+ }
+ @media(max-width:1300px){
+  .app-shell .workspace .topbar .ministry-emblem,.app-shell .workspace .topbar .school-identity .national-marks{display:none}
+ }
+ @media(max-width:1150px){
+  .app-shell .sidebar{width:208px}
+  .app-shell .workspace{margin-right:208px}
+  .app-shell .workspace .topbar{padding-inline:20px}
+  .app-shell main{padding-inline:20px}
+  .app-shell .home-grid.home-columns{grid-template-columns:minmax(0,1fr)}
+  .app-shell .stats.home-stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+ }
+
+ /* ---------- Phone: header is one line, the menu in a three-dot list, tabs scroll sideways ---------- */
+ @media(max-width:760px){
+  .app-shell .sidebar{display:none}
+  .app-shell .workspace{margin:0}
+  .app-shell .workspace .topbar{position:static;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"id tools" "clock clock";min-height:0;padding:10px 14px 8px;gap:6px 10px}
+  .app-shell .workspace .topbar .school-emblem{width:36px;height:36px}
+  .app-shell .workspace .topbar .ministry-emblem,.app-shell .workspace .topbar .school-identity .national-marks{display:none}
+  .app-shell .workspace .topbar .school-identity b{font-size:calc(14px * var(--workspace-font-scale,1))}
+  .app-shell .top-actions>*{display:none}
+  .app-shell .top-actions>.user-avatar,.app-shell .top-actions>.top-menu{display:inline-grid}
+  .app-shell .school-clock{padding:4px 12px;justify-self:start;gap:10px}
+  .app-shell .school-clock strong{font-size:calc(13px * var(--workspace-font-scale,1))}
+  .app-shell .school-clock .school-clock-time time{font-size:calc(13px * var(--workspace-font-scale,1))}
+  .app-shell main{padding:12px 14px 28px}
+  .app-shell .section-services{position:static;margin:0 -14px 12px;padding:0 14px;gap:0}
+  .app-shell .section-services-heading{display:none}
+  .app-shell .section-services nav{margin-inline:-14px;padding-inline:14px;scroll-snap-type:x proximity}
+  .app-shell .section-services nav button{padding:8px 12px;font-size:calc(13px * var(--workspace-font-scale,1));scroll-snap-align:start}
+  .app-shell .section-services nav button.quick:first-of-type{margin-inline-start:6px}
+  .app-shell .page-heading{margin-bottom:10px;padding-bottom:6px;align-items:center}
+  .app-shell .page-heading h1{font-size:calc(21px * var(--workspace-font-scale,1))}
+  .app-shell .page-heading .primary{min-height:42px;padding-inline:14px;font-size:calc(13px * var(--workspace-font-scale,1))}
+  .app-shell .daily-shortcuts{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+  .app-shell .daily-shortcuts button{flex-direction:column;justify-content:center;gap:6px;min-height:84px;padding:10px 6px;text-align:center;border-radius:13px}
+  .app-shell .daily-shortcuts button>span{flex:0 1 auto;gap:0;justify-items:center}
+  .app-shell .daily-shortcuts button>svg:last-child,.app-shell .daily-shortcuts small{display:none}
+  .app-shell .daily-shortcuts b{font-size:calc(13px * var(--workspace-font-scale,1));line-height:1.5}
+  .app-shell .stats.home-stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .app-shell .home-stats .stat{padding:11px 12px}
+  .app-shell .home-stats .stat>b{font-size:calc(24px * var(--workspace-font-scale,1))}
+ }
+ @media(prefers-reduced-motion:reduce){.app-shell .home-stats .stat{transition:none}.app-shell .home-stats .stat:hover{transform:none}}
+}
