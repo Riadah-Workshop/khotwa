@@ -7,6 +7,7 @@ import SchoolIdentity from './school-identity';
 import {PROGRAM_OWNER_CREDIT} from '../lib/brand';
 import {openWhatsappMessage} from '../lib/whatsapp';
 import type {Visit} from './visitors-panel';
+import {SheetBack} from './ui/sheet';
 
 const SUGGESTIONS:Record<string,[string,string]>={
  'سؤال عن طالب':['متابعة ما تمت مناقشته عن الطالب والتواصل مع وكيل شؤون الطلاب عند الحاجة.','متابعة التوصية المتفق عليها مع المدرسة.'],
@@ -37,7 +38,7 @@ export default function VisitorGuidance({visit,school,printing,onPrint,onClose}:
  const valid=!!recommendation.trim()&&!!action.trim();
  const message=[school,title,'الزائر / ولي الأمر: '+visit.name,...(visit.hasChild?['الابن: '+visit.childName,...(visit.childClass?['الصف: '+visit.childClass]:[])]:[]),'سبب الزيارة: '+visit.reason,'تاريخ البطاقة: '+issued,'التوصية: '+recommendation.trim(),'المطلوب: '+action.trim(),...(followDate?['موعد المتابعة: '+formattedDate(followDate,language)]:[]),PROGRAM_OWNER_CREDIT].join('\n');
  return <>
-  <div className="modal-backdrop no-print"><section className="modal guidance-editor" role="dialog" aria-modal="true" aria-labelledby="guidance-title">
+  <div className="modal-backdrop no-print"><section className="modal guidance-editor" role="dialog" aria-modal="true" aria-labelledby="guidance-title"><SheetBack onClick={onClose}/>
    <h2 id="guidance-title">{ui(title)}</h2>
    <div className="guidance-actions"><button className="primary" disabled={!valid} onClick={onPrint}><Printer size={20}/> <UiText text={" طباعة / حفظ PDF"}/></button><button className="guidance-whatsapp" disabled={!valid||!validPhone} onClick={()=>{openWhatsappMessage(phone,message);setMessageReady(true);}}><MessageCircle size={20}/> <UiText text={" فتح واتساب بالبطاقة"}/></button><button className="ghost guidance-close" onClick={onClose} aria-label={ui("إغلاق بطاقة الإرشاد")}><X size={20}/></button></div>
    <p className="small muted"><UiText text={"زر واتساب يجهّز الرسالة؛ تُتم الإرسال يدويًا داخل واتساب."}/></p>

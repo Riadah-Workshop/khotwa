@@ -1,0 +1,27 @@
+/*
+ * Editing never floats over the page. What used to open as a popup (a dark backdrop and a small box) is a page of its
+ * own that replaces what is on the screen: a Back bar at the top, the form, and Save / Cancel at the bottom. Loaded
+ * last so it wins over the older modal rules. Print previews are not editing and keep their own layer.
+ */
+body .modal-backdrop{position:fixed;inset:0;z-index:50;display:block;padding:0;background:var(--bg,#f5f7f4);backdrop-filter:none;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+body .modal-backdrop>.modal{width:min(960px,100%);max-width:960px;min-height:100%;max-height:none;margin:0 auto;padding:0 clamp(14px,3vw,32px) 96px;border:0;border-radius:0;box-shadow:none;background:#fff;animation:none;overflow:visible}
+body .modal-backdrop>.modal:is(.case-evidence-modal,.care-review-modal){max-width:1100px}
+body .modal-backdrop .modal .section-head{align-items:center}
+.sheet-bar{position:sticky;top:0;z-index:3;margin:0 calc(-1 * clamp(14px,3vw,32px)) 14px;padding:10px clamp(14px,3vw,32px);background:#fff;border-bottom:1px solid var(--line,#e5eae4)}
+.sheet-back{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 16px;border-radius:12px;border:1px solid var(--line,#d7ded8);background:#f3f7f4;color:var(--green,#174f42);font-weight:700;cursor:pointer}
+.sheet-back:hover:not(:disabled){background:#e7f0ea}
+.sheet-back:disabled{opacity:.55;cursor:not-allowed}
+[dir=rtl] .sheet-flip,.localized-workspace[dir=rtl] .sheet-flip{transform:scaleX(-1)}
+/* Save / Cancel stay in reach at the bottom of a long form, on a phone too */
+body .modal-backdrop>.modal .form-footer{position:sticky;bottom:0;z-index:2;margin:18px calc(-1 * clamp(14px,3vw,32px)) 0;padding:12px clamp(14px,3vw,32px);background:#fff;border-top:1px solid var(--line,#e5eae4);box-shadow:0 -6px 18px #10291914}
+@media (max-width:640px){body .modal-backdrop>.modal .form-footer{flex-wrap:wrap}body .modal-backdrop>.modal .form-footer>button{flex:1 1 140px}}
+@media print{.sheet-bar{display:none!important}}
+
+/* A question asked in a bar at the top of the page (useAsk), instead of the browser's confirm() box */
+.ask-bar{position:fixed;z-index:80;top:12px;inset-inline:12px;max-width:760px;margin-inline:auto;display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:12px 16px;border-radius:16px;background:#fff8e6;border:1px solid #e6c77a;color:#5b4108;box-shadow:0 10px 30px #10291933;font-weight:600;line-height:1.6}
+.ask-text{flex:1 1 260px}
+.ask-buttons{display:flex;gap:8px;flex-wrap:wrap}
+.ask-bar button{min-height:42px;padding:0 18px;border-radius:12px;border:1px solid #cdb36f;background:#fff;color:#5b4108;font-weight:700;cursor:pointer}
+.ask-bar .ask-yes{background:#174f42;border-color:#174f42;color:#fff}
+.ask-bar .ask-yes.is-danger{background:#aa423c;border-color:#973832}
+@media print{.ask-bar{display:none!important}}

@@ -4,7 +4,7 @@ import type {FormEvent} from 'react';
 import {Check, Clock, Copy, Landmark, Plus, Receipt, RefreshCcw, ScanLine, Settings, ShoppingBasket, TrendingUp, Wallet, X, Printer, ShieldCheck} from 'lucide-react';
 import '../ui/kx.css';
 import './fushati-parent.css';
-import {Badge, Card, Chip, Empty, Notice, Stat, TabPanel, Tabs} from '../ui/kx';
+import {Badge, Card, Chip, ConfirmButton, Empty, Notice, Stat, TabPanel, Tabs} from '../ui/kx';
 import type {Tone} from '../ui/kx';
 
 type Cafe = {id: string; name: string; bank_name: string; iban: string; beneficiary: string; active: number};
@@ -110,7 +110,7 @@ export default function FushatiParent({schoolId, studentId, language = 'ar', stu
     }
   }
   async function rotateCard() {
-    if (!record || !confirm(t('هل فُقدت البطاقة؟ سيتم إلغاء البطاقة المطبوعة السابقة نهائياً.', 'Lost card? This permanently invalidates the previous printed card.'))) return;
+    if (!record) return;
     await post('rotate-card', {cafeteriaId: record.cafeteria.id, studentId});
     setQrImage('');
   }
@@ -248,7 +248,9 @@ export default function FushatiParent({schoolId, studentId, language = 'ar', stu
               <p className="fsp-help">{t('إذا فُقدت البطاقة، ألغها وأصدر أخرى، فتتوقف البطاقة القديمة عن العمل فوراً.', 'If the card is lost, cancel it and issue a new one; the old card stops working immediately.')}</p>
               <div className="kx-btn-row">
                 <button type="button" className="kx-btn is-solid" data-tone="teal" onClick={generateQr} disabled={busy || !record.cafeteria.active}><ScanLine size={18}/>{t('عرض البطاقة الدائمة', 'Show permanent card')}</button>
-                <button type="button" className="kx-btn" data-tone="red" onClick={rotateCard} disabled={busy}><X size={18}/>{t('إلغاء بطاقة مفقودة', 'Revoke lost card')}</button>
+                <ConfirmButton tone="red" small={false} label={t('إلغاء بطاقة مفقودة', 'Revoke lost card')} icon={<X size={18}/>} disabled={busy}
+                  message={t('هل فُقدت البطاقة؟ سيتم إلغاء البطاقة المطبوعة السابقة نهائياً.', 'Lost card? This permanently invalidates the previous printed card.')}
+                  confirmLabel={t('نعم، إلغاء البطاقة', 'Yes, revoke it')} cancelLabel={t('لا', 'No')} onConfirm={rotateCard}/>
               </div>
               {qrImage && <div className="fsp-qr">
                 <div className="fsp-print-card"><strong>{t('خطوة × فسحتي | Khotwa × Fushati', 'Khotwa × Fushati')}</strong><p><b>{studentName || record.studentName}</b></p><p>{schoolName || record.schoolName} — {record.cafeteria.name}</p><img alt={t('رمز بطاقة الطالب للمقصف', 'Student cafeteria card code')} src={qrImage} width="260" height="260"/><small>{t('بطاقة طالب دائمة — هذا الرمز يخص الطالب والمقصف فقط', 'Permanent student card — valid at this cafeteria only')}</small></div>
