@@ -125,3 +125,19 @@ export function ConfirmButton({label, icon, tone = 'red', message, confirmLabel,
     <button type="button" className="kx-btn is-small" autoFocus onClick={() => setAsking(false)}>{cancelLabel}</button>
   </span>;
 }
+
+/** For something very hard to undo (a school, an account): the first press asks for a value to be typed again, so it cannot be done by accident. */
+export function TypeToConfirm({label, icon, tone = 'red', message, expected, confirmLabel, cancelLabel, onConfirm, disabled, small = true}: {
+  label: string; icon?: ReactNode; tone?: Tone; message: string; expected: string; confirmLabel: string; cancelLabel: string; onConfirm: () => void; disabled?: boolean; small?: boolean;
+}) {
+  const [asking, setAsking] = useState(false);
+  const [typed, setTyped] = useState('');
+  if (!asking) return <button type="button" className={cx('kx-btn', small && 'is-small', 'is-soft')} data-tone={tone} disabled={disabled} onClick={() => setAsking(true)}>{icon}{label}</button>;
+  const close = () => { setAsking(false); setTyped(''); };
+  return <span className="kx-confirm is-wide" role="group" aria-label={message}>
+    <span>{message} <code dir="ltr">{expected}</code></span>
+    <input className="kx-input kx-confirm-input" dir="ltr" autoFocus autoComplete="off" spellCheck={false} value={typed} onChange={(event) => setTyped(event.target.value)} aria-label={message}/>
+    <button type="button" className="kx-btn is-small is-solid" data-tone={tone} disabled={disabled || typed.trim() !== expected} onClick={() => { close(); onConfirm(); }}>{confirmLabel}</button>
+    <button type="button" className="kx-btn is-small" onClick={close}>{cancelLabel}</button>
+  </span>;
+}

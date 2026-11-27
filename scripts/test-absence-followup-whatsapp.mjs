@@ -22,6 +22,7 @@ new Function('exports','require',transpile('app/absence-followups.tsx'))(out,nam
  if(name==='react')return React;
  if(name==='react/jsx-runtime')return runtime;
  if(name==='./locale')return {useLocale:()=>({ui:text=>text,language:'ar'}),UiText:'ui-text'};
+ if(name==='./ui/sheet')return {SheetBack:'sheet-back'};
  if(name.endsWith('absence-followup-whatsapp'))return helper;
  if(name.endsWith('field-colors'))return {fieldTone:()=>''};
  if(name==='lucide-react')return {Phone:'phone-icon',Check:'check-icon',Search:'search-icon',Copy:'copy-icon',X:'close-icon'};

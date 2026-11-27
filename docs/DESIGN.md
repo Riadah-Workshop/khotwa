@@ -76,9 +76,19 @@ Nothing that adds or changes a record opens a popup. The kit has two pieces for 
 - `ConfirmButton` is for something that cannot be undone (delete, disable, reset a password). The first press turns the
   button into "Are you sure? Yes / No" in the same place.
 
-So: *add or change* = an `EditorView` (enter, save, leave); *confirm* = a `ConfirmButton`; *a reason to type* (rejecting a
-transfer) = a field that opens in the row. The browser's `confirm()`, `prompt()` and `alert()` are not used. Print
-previews are not editing and keep their own full-screen layer.
+- `TypeToConfirm` is for the hardest-to-undo actions (delete a school or an account): the first press asks for the
+  school code, email or record key to be typed again.
+- The older Student Affairs screens built their forms as `.modal-backdrop > .modal`. `app/ui/sheet.css` (loaded last)
+  turns every one of them into a page: an opaque full-screen layer with no dark backdrop, a sticky `<SheetBack>` bar
+  (`app/ui/sheet.tsx`) at the top and the Save / Cancel footer pinned to the bottom. A new modal must start with
+  `<SheetBack onClick={close}/>`; `scripts/test-no-popups.mjs` fails otherwise.
+- `useAsk()` (`app/ui/ask.tsx`) is for a question that has to be asked from code ("leave without saving?", "replace the
+  draft?"): a bar at the top of the page with Yes and No, No focused. It replaces `confirm()`.
+
+So: *add or change* = an `EditorView` or a sheet (enter, save, leave); *confirm* = a `ConfirmButton` or `useAsk`; *type to
+confirm* = `TypeToConfirm`; *a reason to type* (rejecting a transfer) = a field that opens in the row. The browser's
+`confirm()`, `prompt()` and `alert()` are not used. Print previews and the guided tour are not editing and keep their own
+layers.
 
 ## Adding a screen or a step
 

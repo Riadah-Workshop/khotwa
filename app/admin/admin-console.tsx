@@ -7,7 +7,7 @@ import {SAUDI_REGIONS, saudiRegion, saudiCity} from '../../lib/saudi-locations';
 import {SCHOOL_STAGES} from '../../lib/school-stages';
 import '../ui/kx.css';
 import './admin.css';
-import {Badge, Card, Chip, Empty, Notice, PageHead, Stat, TabPanel, Tabs} from '../ui/kx';
+import {Badge, Card, Chip, ConfirmButton, EditorView, Empty, Notice, PageHead, Stat, TabPanel, Tabs, TypeToConfirm} from '../ui/kx';
 import type {Tone} from '../ui/kx';
 import {GuidedTour, TourHelpButton, useTour} from '../ui/tour';
 
@@ -44,6 +44,7 @@ export default function AdminConsole({activeSchoolId, tourKey}: {activeSchoolId:
   const [recordHasMore, setRecordHasMore] = useState(false);
   const [school, setSchool] = useState<SchoolDraft>(emptySchool);
   const [editingSchool, setEditingSchool] = useState<School | null>(null);
+  const [editingAccount, setEditingAccount] = useState<{id: string; fullName: string; schoolId: string} | null>(null);
   const [account, setAccount] = useState({schoolId: '', fullName: '', email: '', role: 'deputy'});
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
@@ -122,7 +123,6 @@ export default function AdminConsole({activeSchoolId, tourKey}: {activeSchoolId:
     }
   }
   useEffect(() => { setRows([]); setRecordPage(0); setRecordHasMore(false); }, [recordSchool, table, query]);
-  useEffect(() => { if (editingSchool) document.getElementById('admin-edit-school')?.scrollIntoView({block: 'start', behavior: 'smooth'}); }, [editingSchool?.id]);
 
   const openSection = useCallback((value: string) => {
     if (['overview', 'schools', 'users', 'cafeteria', 'records', 'security'].includes(value)) setSection(value as AdminSection);
@@ -148,41 +148,21 @@ export default function AdminConsole({activeSchoolId, tourKey}: {activeSchoolId:
     </div>;
   }
 
-  async function deleteSchool(s: School) {
-    const code = prompt(t('حذف نهائي للمدرسة وجميع بياناتها ومرفقاتها وحساباتها! اكتب رمز المدرسة للتأكيد:', 'PERMANENTLY delete the school, its data, attachments and accounts! Type the school code:'), '');
-    if (code !== s.code) return;
-    if (confirm(t('تأكيد نهائي: لا يمكن التراجع. احتفظ بنسخة احتياطية.', 'Final confirmation: This cannot be undone. Back up first.'))) await save('delete-school', {schoolId: s.id, confirmCode: code});
-  }
-  async function editAccount(u: Account) {
-    const fullName = prompt(t('الاسم الجديد', 'Updated name'), u.full_name);
-    if (!fullName) return;
-    const code = prompt(t('رمز المدرسة الجديدة', 'New school code'), schools.find(s => s.id === u.school_id)?.code || '');
-    const schoolId = schools.find(s => s.code === code?.trim().toUpperCase())?.id;
-    if (!schoolId) { setError(t('رمز مدرسة غير صحيح', 'Invalid school code')); return; }
-    await save('edit-account', {id: u.id, schoolId, fullName, active: !!u.active});
-  }
-  function deleteAccount(u: Account) {
-    const email = prompt(t('اكتب البريد الإلكتروني للتأكيد والحذف النهائي', 'Type the email address to confirm permanent deletion'));
-    if (email === u.email && confirm(t('حذف هذا الحساب بشكل نهائي؟', 'Permanently delete this account?'))) save('delete-account', {id: u.id, confirmEmail: email});
-  }
-  async function deleteRecord(row: RecordRow) {
-    const key = String(row[recordKey] || '');
-    const confirmKey = prompt(t('للتأكيد اكتب معرّف السجل حرفيًا: ', 'Type the exact record key to confirm deletion: ') + key);
-    if (confirmKey !== key) return;
-    if (await save('delete-record', {schoolId: recordSchool, table, key})) loadRecords();
-  }
-  function deleteParent() {
-    if (!parentPhone) return;
-    const confirmPhone = prompt(t('أعد إدخال رقم الجوال لحذف حساب ولي الأمر نهائيًا', 'Re-enter phone number to permanently delete parent access'));
-    if (confirmPhone === parentPhone) save('delete-parent', {schoolId: selected, phone: parentPhone});
-  }
+  const startTour = () => { setEditingSchool(null); setEditingAccount(null); tour.start(); };
+  const originalSchool = editingSchool ? schools.find(x => x.id === editingSchool.id) : undefined;
+  const schoolDirty = !!editingSchool && !!originalSchool && (['name', 'code', 'region', 'city', 'stage', 'active'] as const).some(k => String(editingSchool[k] ?? '') !== String(originalSchool[k] ?? ''));
+  const editedAccount = editingAccount ? accounts.find(a => a.id === editingAccount.id) : undefined;
+  const accountDirty = !!editingAccount && !!editedAccount && (editingAccount.fullName !== editedAccount.full_name || editingAccount.schoolId !== editedAccount.school_id);
+  const focused = !!editingSchool || !!(editingAccount && editedAccount);
+  const dirtyText = t('لم تحفظ التعديلات. هل تتجاهلها وتخرج؟', 'You have unsaved changes. Discard them and leave?');
+  const cancelText = t('إلغاء', 'Cancel');
 
   return <div className="kx-scope" data-accent="violet" dir={en ? 'ltr' : 'rtl'} lang={lang}>
     <header className="kx-topbar">
       <div className="kx-brand"><span className="kx-brand-mark"><ShieldCheck size={26}/></span><div><strong>{t('خطوة • الإدارة المركزية', 'Khotwa • Central Administration')}</strong><small>{t('مدير النظام', 'System administrator')}</small></div></div>
       <div className="kx-topbar-actions" data-tour="tools">
         <button type="button" className="kx-btn" onClick={() => changeLanguage(en ? 'ar' : 'en')} aria-label={en ? 'العربية' : 'English'}><Languages size={18}/><span className="kx-btn-text">{en ? 'العربية' : 'English'}</span></button>
-        <TourHelpButton language={lang} onClick={tour.start}/>
+        <TourHelpButton language={lang} onClick={startTour}/>
         <a className="kx-btn" href="/manager" aria-label={t('تقارير مدير المدرسة', 'Manager reports')}><ChartColumn size={18}/><span className="kx-btn-text">{t('تقارير مدير المدرسة', 'Manager reports')}</span></a>
         <a className="kx-btn" href="/admin" aria-label={t('تحديث', 'Refresh')}><RefreshCw size={18}/><span className="kx-btn-text">{t('تحديث', 'Refresh')}</span></a>
         <a className="kx-btn" href="/logout?next=/admin-login" aria-label={t('تسجيل الخروج', 'Sign out')}><LogOut size={18}/><span className="kx-btn-text">{t('تسجيل الخروج', 'Sign out')}</span></a>
@@ -190,6 +170,28 @@ export default function AdminConsole({activeSchoolId, tourKey}: {activeSchoolId:
     </header>
 
     <main className="kx-page">
+      {editingSchool && <EditorView title={t('تعديل المدرسة', 'Edit school')} description={editingSchool.name} icon={<Pencil size={26}/>} tone="blue"
+        onBack={() => { setEditingSchool(null); setError(''); }} backLabel={t('رجوع إلى المدارس', 'Back to schools')}
+        dirty={schoolDirty} dirtyMessage={dirtyText} keepLabel={t('متابعة التعديل', 'Keep editing')} discardLabel={t('تجاهل والخروج', 'Discard and leave')}
+        actions={<><button type="submit" form="admin-school-form" className="kx-btn is-solid" data-tone="blue" disabled={busy}><Check size={18}/>{busy ? t('جارٍ الحفظ…', 'Saving…') : t('حفظ التغييرات', 'Save changes')}</button><button type="button" className="kx-btn" disabled={busy} onClick={() => { setEditingSchool(null); setError(''); }}><X size={18}/>{cancelText}</button></>}>
+        {error && <Notice tone="red" icon={<X size={18}/>} role="alert">{error}</Notice>}
+        <form id="admin-school-form" className="kx-grid" onSubmit={async e => { e.preventDefault(); if (await save('edit-school', {id: editingSchool.id, name: editingSchool.name, code: editingSchool.code, active: !!editingSchool.active, region: editingSchool.region, city: editingSchool.city, stage: editingSchool.stage})) setEditingSchool(null); }}>
+          {schoolFields(editingSchool, next => setEditingSchool({...editingSchool, ...next}), <label className="kx-check"><input type="checkbox" checked={!!editingSchool.active} onChange={e => setEditingSchool({...editingSchool, active: e.target.checked ? 1 : 0})}/>{t('مدرسة نشطة', 'Active school')}</label>)}
+        </form>
+      </EditorView>}
+      {editingAccount && editedAccount && <EditorView title={t('تعديل المستخدم', 'Edit user')} description={`${editedAccount.email} — ${roleName(editedAccount.role)}`} icon={<Pencil size={26}/>} tone="blue"
+        onBack={() => { setEditingAccount(null); setError(''); }} backLabel={t('رجوع إلى المستخدمين', 'Back to users')}
+        dirty={accountDirty} dirtyMessage={dirtyText} keepLabel={t('متابعة التعديل', 'Keep editing')} discardLabel={t('تجاهل والخروج', 'Discard and leave')}
+        actions={<><button type="submit" form="admin-account-form" className="kx-btn is-solid" data-tone="blue" disabled={busy || editingAccount.fullName.trim().length < 3}><Check size={18}/>{busy ? t('جارٍ الحفظ…', 'Saving…') : t('حفظ التغييرات', 'Save changes')}</button><button type="button" className="kx-btn" disabled={busy} onClick={() => { setEditingAccount(null); setError(''); }}><X size={18}/>{cancelText}</button></>}>
+        {error && <Notice tone="red" icon={<X size={18}/>} role="alert">{error}</Notice>}
+        <form id="admin-account-form" className="kx-grid" onSubmit={async e => { e.preventDefault(); if (await save('edit-account', {id: editingAccount.id, schoolId: editingAccount.schoolId, fullName: editingAccount.fullName.trim(), active: !!editedAccount.active})) setEditingAccount(null); }}>
+          <div className="kx-form-grid">
+            <label className="kx-field">{t('الاسم', 'Full name')}<input className="kx-input" required minLength={3} maxLength={150} autoFocus value={editingAccount.fullName} onChange={e => setEditingAccount({...editingAccount, fullName: e.target.value})}/></label>
+            <label className="kx-field">{t('المدرسة', 'School')}<select className="kx-select" required value={editingAccount.schoolId} onChange={e => setEditingAccount({...editingAccount, schoolId: e.target.value})}>{schools.map(sc => <option key={sc.id} value={sc.id}>{sc.name}{sc.active ? '' : t(' (موقوفة)', ' (disabled)')}</option>)}</select></label>
+          </div>
+        </form>
+      </EditorView>}
+      {!focused && <>
       <PageHead icon={<ShieldCheck size={26}/>} tone="violet" title={t('إدارة المدارس والصلاحيات', 'Schools & Access Management')} description={t('مدير النظام: كل المدارس والحسابات والعمليات الحساسة.', 'System administrator: all schools, accounts, and privileged operations.')}/>
       {error && <Notice tone="red" icon={<X size={18}/>} role="alert">{error}</Notice>}
       {message && <Notice tone="green" icon={<Check size={18}/>} role="status">{message}</Notice>}
@@ -246,16 +248,12 @@ export default function AdminConsole({activeSchoolId, tourKey}: {activeSchoolId:
               <div className="kx-btn-row">
                 <button type="button" className="kx-btn is-solid is-small" data-tone="green" disabled={busy || !s.active} onClick={() => switchSchool(s.id)}><DoorOpen size={16}/>{t('فتح', 'Open')}</button>
                 <button type="button" className="kx-btn is-small" data-tone="blue" disabled={busy} onClick={() => { setEditingSchool(s); setSection('schools'); }}><Pencil size={16}/>{t('تعديل / إعادة تسمية', 'Edit / rename')}</button>
-                <button type="button" className="kx-btn is-small" data-tone="red" disabled={busy} onClick={() => deleteSchool(s)}><Trash2 size={16}/>{t('حذف نهائي', 'Delete permanently')}</button>
+                <TypeToConfirm label={t('حذف نهائي', 'Delete permanently')} icon={<Trash2 size={16}/>} disabled={busy} expected={s.code}
+                  message={t('حذف نهائي للمدرسة وجميع بياناتها ومرفقاتها وحساباتها! لا يمكن التراجع، فاحتفظ بنسخة احتياطية. اكتب رمز المدرسة للتأكيد:', 'PERMANENTLY delete the school, its data, attachments and accounts! This cannot be undone, so back up first. Type the school code to confirm:')}
+                  confirmLabel={t('احذف نهائياً', 'Delete for good')} cancelLabel={cancelText} onConfirm={() => { void save('delete-school', {schoolId: s.id, confirmCode: s.code}); }}/>
               </div>
             </article>)}</div>}
         </Card>
-        {editingSchool && <Card id="admin-edit-school" tone="blue" icon={<Pencil size={18}/>} title={t('تعديل المدرسة', 'Edit school')} description={editingSchool.name}>
-          <form className="kx-grid" onSubmit={async e => { e.preventDefault(); if (await save('edit-school', {id: editingSchool.id, name: editingSchool.name, code: editingSchool.code, active: !!editingSchool.active, region: editingSchool.region, city: editingSchool.city, stage: editingSchool.stage})) setEditingSchool(null); }}>
-            {schoolFields(editingSchool, next => setEditingSchool({...editingSchool, ...next}), <label className="kx-check"><input type="checkbox" checked={!!editingSchool.active} onChange={e => setEditingSchool({...editingSchool, active: e.target.checked ? 1 : 0})}/>{t('مدرسة نشطة', 'Active school')}</label>)}
-            <div className="kx-btn-row"><button className="kx-btn is-solid" data-tone="blue" disabled={busy}><Check size={18}/>{t('حفظ التغييرات', 'Save changes')}</button><button type="button" className="kx-btn" onClick={() => setEditingSchool(null)}><X size={18}/>{t('إلغاء', 'Cancel')}</button></div>
-          </form>
-        </Card>}
         <Card tourId="admin-create-school" tone="green" icon={<Plus size={18}/>} title={t('إنشاء مدرسة', 'Create school')} description={t('رمز المدرسة يُستخدم في الدخول والتقارير؛ اختر رمزاً قصيراً لا يتكرر.', 'The code is used for sign-in and reports; choose a short, unique one.')}>
           <form className="kx-grid" onSubmit={e => { e.preventDefault(); save('create-school', school).then(ok => { if (ok) setSchool(emptySchool); }); }}>
             {schoolFields(school, setSchool, undefined, 'SCH-001')}
@@ -289,10 +287,12 @@ export default function AdminConsole({activeSchoolId, tourKey}: {activeSchoolId:
                 </dl>
               </details>
               <div className="kx-btn-row">
-                <button type="button" className="kx-btn is-small" data-tone="blue" disabled={busy} onClick={() => editAccount(u)}><Pencil size={16}/>{t('تعديل / نقل', 'Edit / move')}</button>
+                <button type="button" className="kx-btn is-small" data-tone="blue" disabled={busy} onClick={() => { setError(''); setMessage(''); setEditingAccount({id: u.id, fullName: u.full_name, schoolId: u.school_id}); }}><Pencil size={16}/>{t('تعديل / نقل', 'Edit / move')}</button>
                 <button type="button" className="kx-btn is-small" data-tone={u.active ? 'amber' : 'green'} disabled={busy} onClick={() => save('edit-account', {id: u.id, schoolId: u.school_id, fullName: u.full_name, active: !u.active})}><Power size={16}/>{u.active ? t('إيقاف', 'Disable') : t('تفعيل', 'Enable')}</button>
-                <button type="button" className="kx-btn is-small" data-tone="teal" disabled={busy || !u.active} onClick={() => { if (confirm(t('إرسال رابط آمن لتعيين كلمة المرور؟', 'Send a secure password-set/reset link?'))) save('resend-account', {id: u.id}); }}><KeyRound size={16}/>{t('إرسال رابط الدخول', 'Send access link')}</button>
-                <button type="button" className="kx-btn is-small" data-tone="red" disabled={busy} onClick={() => deleteAccount(u)}><Trash2 size={16}/>{t('حذف', 'Delete')}</button>
+                <ConfirmButton tone="teal" label={t('إرسال رابط الدخول', 'Send access link')} icon={<KeyRound size={16}/>} disabled={busy || !u.active} message={t('إرسال رابط آمن لتعيين كلمة المرور؟', 'Send a secure password-set/reset link?')} confirmLabel={t('نعم، أرسل', 'Yes, send')} cancelLabel={t('لا', 'No')} onConfirm={() => { void save('resend-account', {id: u.id}); }}/>
+                <TypeToConfirm label={t('حذف', 'Delete')} icon={<Trash2 size={16}/>} disabled={busy} expected={u.email}
+                  message={t('حذف هذا الحساب بشكل نهائي؟ اكتب البريد الإلكتروني للتأكيد:', 'Permanently delete this account? Type the email address to confirm:')}
+                  confirmLabel={t('احذف نهائياً', 'Delete for good')} cancelLabel={cancelText} onConfirm={() => { void save('delete-account', {id: u.id, confirmEmail: u.email}); }}/>
               </div>
             </article>)}</div>}
         </Card>
@@ -328,7 +328,9 @@ export default function AdminConsole({activeSchoolId, tourKey}: {activeSchoolId:
           {rows.length > 0 && <div className="kx-table-wrap"><table className="kx-table"><thead><tr><th>{t('مفتاح السجل', 'Record key')}</th><th>{t('الوصف', 'Summary')}</th><th>{t('الإجراء', 'Action')}</th></tr></thead><tbody>{rows.map((row, i) => <tr key={i}>
             <td dir="ltr">{String(row[recordKey] ?? '')}</td>
             <td><code className="admin-code">{Object.entries(row).filter(([k]) => k !== recordKey).map(([k, v]) => `${k}: ${String(v ?? '').slice(0, 85)}`).join(' · ').slice(0, 260)}</code></td>
-            <td><button type="button" className="kx-btn is-small" data-tone="red" disabled={busy} onClick={() => deleteRecord(row)}><Trash2 size={16}/>{t('حذف', 'Delete')}</button></td>
+            <td><TypeToConfirm label={t('حذف', 'Delete')} icon={<Trash2 size={16}/>} disabled={busy} expected={String(row[recordKey] || '')}
+              message={t('للتأكيد اكتب معرّف السجل حرفيًا:', 'Type the exact record key to confirm deletion:')}
+              confirmLabel={t('احذف نهائياً', 'Delete for good')} cancelLabel={cancelText} onConfirm={() => { void save('delete-record', {schoolId: recordSchool, table, key: String(row[recordKey] || '')}).then(ok => { if (ok) void loadRecords(); }); }}/></td>
           </tr>)}</tbody></table></div>}
           {(recordPage > 0 || recordHasMore) && <div className="kx-btn-row"><button type="button" className="kx-btn is-small" disabled={recordPage === 0 || busy} onClick={() => loadRecords(recordPage - 1)}>{t('السابق', 'Previous')}</button><Badge tone="slate">{t('الصفحة', 'Page')} {recordPage + 1}</Badge><button type="button" className="kx-btn is-small" disabled={!recordHasMore || busy} onClick={() => loadRecords(recordPage + 1)}>{t('التالي', 'Next')}</button></div>}
         </Card>
@@ -337,7 +339,9 @@ export default function AdminConsole({activeSchoolId, tourKey}: {activeSchoolId:
             <label className="kx-field">{t('المدرسة', 'School')}<select className="kx-select" value={selected} onChange={e => setSelected(e.target.value)}>{schools.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
             <label className="kx-field">{t('جوال ولي الأمر', 'Parent phone')}<input className="kx-input" dir="ltr" placeholder="05xxxxxxxx" value={parentPhone} onChange={e => setParentPhone(e.target.value)}/></label>
           </div>
-          <div className="kx-btn-row"><button type="button" className="kx-btn" data-tone="red" disabled={!schools.some(s => s.id === selected) || busy || !parentPhone} onClick={deleteParent}><Trash2 size={18}/>{t('حذف حساب ولي الأمر', 'Delete parent account')}</button></div>
+          <div className="kx-btn-row"><TypeToConfirm small={false} label={t('حذف حساب ولي الأمر', 'Delete parent account')} icon={<Trash2 size={18}/>} disabled={!schools.some(s => s.id === selected) || busy || !parentPhone} expected={parentPhone}
+            message={t('أعد إدخال رقم الجوال لحذف حساب ولي الأمر نهائيًا:', 'Re-enter the phone number to permanently delete parent access:')}
+            confirmLabel={t('احذف نهائياً', 'Delete for good')} cancelLabel={cancelText} onConfirm={() => { void save('delete-parent', {schoolId: selected, phone: parentPhone}); }}/></div>
         </Card>
       </TabPanel>
 
@@ -354,6 +358,7 @@ export default function AdminConsole({activeSchoolId, tourKey}: {activeSchoolId:
         </Card>
         <Notice tone="slate" icon={<CircleHelp size={18}/>}>{t('الأدوار: مدير النظام / وكيل شؤون الطلاب / مدير المدرسة / ولي الأمر / مدير فسحتي / موظف المقصف', 'Six roles: System Admin / Student Affairs Agent / School Manager / Parent / Fushati Admin / Cafeteria Agent')}</Notice>
       </TabPanel>
+      </>}
     </main>
     <GuidedTour platform="admin" accent="violet" open={tour.open} onClose={tour.close} language={lang} onSection={openSection}/>
   </div>;

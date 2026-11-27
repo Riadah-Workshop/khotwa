@@ -181,3 +181,5 @@
  .kx-tab{flex:1 0 auto;min-width:74px;flex-direction:column;gap:3px;padding:7px 6px;font-size:12px;line-height:1.2;white-space:normal;text-align:center;min-height:56px}
 }
 @media print{.kx-topbar,.kx-tabs,.kx-no-print,.kx-tour-root{display:none!important}.kx-scope{background:#fff}.kx-card{box-shadow:none}}
+.kx-confirm-input{min-width:150px;flex:1 1 150px;max-width:260px}
+.kx-confirm code{padding:1px 6px;border-radius:6px;background:var(--kx-red-bg,#fdecec);font-weight:700;overflow-wrap:anywhere}

@@ -21,6 +21,7 @@ import './school-work.css';
 import './registration.css';
 import './incidents.css';
 import './iphone-compatibility.css';
+import './ui/sheet.css';
 import {REGISTRATION_PRINT} from '../lib/registration';
 export const metadata:Metadata={title:'خطوة | نظام إدارة أعمال الوكيل المدرسي',description:'خطوة — نظام إدارة أعمال الوكيل المدرسي: تنظيم المهام، متابعة الطلاب، التواصل والتقارير — '+PROGRAM_OWNER_CREDIT,authors:[{name:PROGRAM_OWNER}],manifest:'/manifest.webmanifest',applicationName:'خطوة',appleWebApp:{capable:true,title:'خطوة',statusBarStyle:'default'},icons:{icon:[{url:'/app-icon-192.png',sizes:'192x192',type:'image/png'}],apple:[{url:'/app-icon-180.png',sizes:'180x180',type:'image/png'}]}};
 export const viewport:Viewport={width:'device-width',initialScale:1,themeColor:'#174f42'};
