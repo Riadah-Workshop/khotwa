@@ -64,3 +64,55 @@
  [data-tour=cfa-report-picker],.cfr-actions,.cfi-actions,.cfi-filters,.cfi-form{display:none!important}
  .cfi-item,.kx-card{break-inside:avoid}
 }
+
+/* ---- products, adding and scanning a barcode ---- */
+.cfm-root{display:grid;gap:16px}
+.cfm-actions{display:flex;gap:10px;flex-wrap:wrap}
+.cfm-items{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;margin-block-start:14px}
+.cfm-item{display:grid;gap:10px;align-content:start;padding:14px;border-radius:16px;border:1px solid var(--kx-border);border-inline-start:5px solid var(--kx-slate-line);background:#fff}
+.cfm-item[data-state=sale]{border-inline-start-color:var(--kx-green-solid)}
+.cfm-item[data-state=off]{border-inline-start-color:var(--kx-amber-solid)}
+.cfm-item[data-state=pending]{border-inline-start-color:var(--kx-blue-solid)}
+.cfm-item header{display:flex;gap:10px;justify-content:space-between;align-items:flex-start}
+.cfm-item header strong{display:block;font-size:16px;line-height:1.3;overflow-wrap:anywhere}
+.cfm-item header small{display:block;color:var(--kx-muted);font-size:13px}
+.cfm-facts,.cfs-facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:8px;margin:0}
+.cfm-facts div,.cfs-facts div{padding:8px 10px;border-radius:10px;background:var(--kx-slate-bg);min-width:0}
+.cfm-facts dt,.cfs-facts dt{font-size:12px;color:var(--kx-muted)}
+.cfm-facts dd,.cfs-facts dd{margin:0;font-weight:700;font-size:14px;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+.cfm-facts dd svg{vertical-align:-2px;color:var(--kx-muted)}
+.cfm-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.cfm-wide,.cfs-wide{grid-column:1/-1}
+.cfm-barcode-row{display:flex;gap:10px;flex-wrap:wrap}
+.cfm-barcode-row .kx-input{flex:1 1 220px}
+.cfm-danger{margin-inline-start:auto}
+.cfs-stack,.cfs-result{display:grid;gap:16px}
+.cfs-capture{display:grid;gap:10px;padding:14px;border-radius:14px;background:var(--kx-slate-bg);border:1px solid var(--kx-slate-line)}
+.cfs-box{display:flex;gap:10px;align-items:end;flex-wrap:wrap}
+.cfs-box .kx-field{flex:1 1 240px}
+.cfs-input{font-size:20px;letter-spacing:.04em;min-height:52px}
+.cfs-video{width:100%;max-height:260px;border-radius:14px;background:#0b1f18;object-fit:cover}
+.cfs-video[hidden]{display:none}
+.cfs-problem{margin:0;color:var(--kx-red-ink);font-weight:600}
+.cfs-looking{margin:0;color:var(--kx-muted);font-weight:600}
+.cfs-saved{padding:12px 14px;border-radius:14px;background:var(--kx-green-bg);border:1px solid var(--kx-green-line);color:var(--kx-green-ink)}
+.cfs-saved strong{display:flex;gap:6px;align-items:center}
+.cfs-saved ul{margin:6px 0 0;padding-inline-start:20px}
+.cfs-saved li{margin:2px 0}
+.cfs-facts{margin-block-end:14px}
+.cfs-qty{display:grid;gap:12px}
+.cfs-qty-input{font-size:26px;min-height:60px;font-weight:700;text-align:center;font-variant-numeric:tabular-nums}
+.cfs-more summary{cursor:pointer;font-weight:700;color:var(--kx-muted);padding:6px 0}
+.cfs-newfields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+@media (max-width:640px){.cfm-form,.cfs-newfields{grid-template-columns:1fr}.cfm-danger{margin-inline-start:0;flex:1 1 100%}.cfm-actions .kx-btn{flex:1 1 100%}}
+.cfm-rowbtns{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.cfm-checks{margin:0;padding:12px 14px;border:1px solid var(--kx-border);border-radius:14px;display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:4px 16px;min-width:0}
+.cfm-checks legend{grid-column:1/-1}
+.cfm-checks legend{padding-inline:6px;font-weight:700}
+.cfm-checks label{display:flex;gap:10px;align-items:center;min-height:40px;cursor:pointer}
+.cfm-checks input[type=checkbox]{width:20px;height:20px;flex:none}
+.cft-actions{display:inline-flex;gap:6px;flex-wrap:wrap;align-items:center}
+.cft-reason{display:grid;gap:4px;flex:1 1 220px;font-size:13px;color:var(--kx-muted)}
+.cfs-camera-row{display:flex;gap:10px;flex-wrap:wrap}
+.cfm-facts .cfm-code{grid-column:1/-1}
+.cfm-facts .cfm-code dd{overflow-wrap:normal;word-break:keep-all;text-align:start}

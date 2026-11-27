@@ -1,4 +1,6 @@
+import {useEffect, useRef, useState} from 'react';
 import type {KeyboardEvent, ReactNode} from 'react';
+import {ArrowLeft, Check, X} from 'lucide-react';
 
 export type Tone = 'green' | 'teal' | 'blue' | 'violet' | 'amber' | 'red' | 'slate';
 
@@ -77,4 +79,49 @@ export function Tabs({items, value, onChange, label, idPrefix, rtl, tourId}: {it
 
 export function TabPanel({idPrefix, id, active, children}: {idPrefix: string; id: string; active: boolean; children: ReactNode}) {
   return <div role="tabpanel" id={`${idPrefix}-panel-${id}`} aria-labelledby={`${idPrefix}-tab-${id}`} hidden={!active} className="kx-grid">{active ? children : null}</div>;
+}
+
+/**
+ * A screen to add or change something, shown in place of the list it came from, never over it: "go in, enter the
+ * details, save, come back out". It replaces popups. The page above and below stays as it was; Back returns to the
+ * list. When `dirty` is true, Back first asks, in the same place, whether to throw the changes away.
+ */
+export function EditorView({title, description, icon, tone, onBack, backLabel, dirty, dirtyMessage, keepLabel, discardLabel, children, actions, tourId}: {
+  title: string; description?: string; icon?: ReactNode; tone?: Tone; onBack: () => void; backLabel: string;
+  dirty?: boolean; dirtyMessage?: string; keepLabel?: string; discardLabel?: string; children: ReactNode; actions?: ReactNode; tourId?: string;
+}) {
+  const [asking, setAsking] = useState(false);
+  const heading = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    heading.current?.focus({preventScroll: true});
+    heading.current?.scrollIntoView({block: 'start'});
+  }, []);
+  const back = () => { if (dirty) setAsking(true); else onBack(); };
+  return <section className="kx-editor" data-tone={tone} data-tour={tourId} aria-labelledby="kx-editor-title">
+    <header className="kx-editor-head">
+      <button type="button" className="kx-btn is-soft" onClick={back}><ArrowLeft size={18} className="kx-flip" aria-hidden="true"/>{backLabel}</button>
+      {icon && <Chip icon={icon} tone={tone} size="large"/>}
+      <div className="kx-editor-title"><h2 id="kx-editor-title" ref={heading} tabIndex={-1}>{title}</h2>{description && <p>{description}</p>}</div>
+    </header>
+    {asking && dirty && <div className="kx-confirm is-wide" role="alert">
+      <span>{dirtyMessage}</span>
+      <button type="button" className="kx-btn is-small is-solid" data-tone="red" onClick={onBack}><X size={16} aria-hidden="true"/>{discardLabel}</button>
+      <button type="button" className="kx-btn is-small" autoFocus onClick={() => setAsking(false)}><Check size={16} aria-hidden="true"/>{keepLabel}</button>
+    </div>}
+    <div className="kx-editor-body">{children}</div>
+    {actions && <div className="kx-editor-bar">{actions}</div>}
+  </section>;
+}
+
+/** A button for something that cannot be undone. The first press turns it into "Are you sure? Yes / No" in the same place. */
+export function ConfirmButton({label, icon, tone = 'red', message, confirmLabel, cancelLabel, onConfirm, disabled, small = true, solid}: {
+  label: string; icon?: ReactNode; tone?: Tone; message: string; confirmLabel: string; cancelLabel: string; onConfirm: () => void; disabled?: boolean; small?: boolean; solid?: boolean;
+}) {
+  const [asking, setAsking] = useState(false);
+  if (!asking) return <button type="button" className={cx('kx-btn', small && 'is-small', solid ? 'is-solid' : 'is-soft')} data-tone={tone} disabled={disabled} onClick={() => setAsking(true)}>{icon}{label}</button>;
+  return <span className="kx-confirm" role="group" aria-label={message}>
+    <span>{message}</span>
+    <button type="button" className="kx-btn is-small is-solid" data-tone={tone} disabled={disabled} onClick={() => { setAsking(false); onConfirm(); }}>{confirmLabel}</button>
+    <button type="button" className="kx-btn is-small" autoFocus onClick={() => setAsking(false)}>{cancelLabel}</button>
+  </span>;
 }

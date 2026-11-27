@@ -66,6 +66,20 @@ description on every tab. Administrators use the teal accent and agents the gree
 - Each panel is keyed by the selected cafeteria, so switching cafeteria always reloads its own data and never
   shows another cafeteria's numbers for a moment.
 
+## Editing without popups
+
+Nothing that adds or changes a record opens a popup. The kit has two pieces for this (`app/ui/kx.tsx`):
+
+- `EditorView` is a screen of its own that takes the place of the list inside the page: a Back button, a heading, the
+  form, and a sticky bar with **Save** and **Cancel** at the bottom (always reachable on a phone). The page hides its
+  tabs while it is open. Back with unsaved changes asks "Discard?" in place, not in a dialog.
+- `ConfirmButton` is for something that cannot be undone (delete, disable, reset a password). The first press turns the
+  button into "Are you sure? Yes / No" in the same place.
+
+So: *add or change* = an `EditorView` (enter, save, leave); *confirm* = a `ConfirmButton`; *a reason to type* (rejecting a
+transfer) = a field that opens in the row. The browser's `confirm()`, `prompt()` and `alert()` are not used. Print
+previews are not editing and keep their own full-screen layer.
+
 ## Adding a screen or a step
 
 1. Put new text in both languages. 2. Reuse a tone and an icon that already mean the same thing elsewhere.

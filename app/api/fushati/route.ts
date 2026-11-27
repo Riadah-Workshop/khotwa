@@ -8,6 +8,7 @@ import {tableName} from '../../../lib/school-sql';
 import {parentPhone as normalizeParentPhone} from '../../../lib/parent-view';
 import {normalizeAgentIdentifier,normalizeContactPhone} from '../../../lib/fushati/identifiers';
 import {issueFushatiInvite} from '../../../lib/fushati/invitations';
+import {barcodeMessage,barcodeProblem,normalizeBarcode} from '../../../lib/fushati/barcode';
 import {AGENT_DEFAULT_PERMISSIONS,cleanPermissions,grantAdministers,grantAllows,parsePermissions,type FushatiPermission} from '../../../lib/fushati/permissions';
 import {db,response,now,keyDate,mustChange,moneyMinor,moneySar,isCafeStaff,permittedCafeteria,cafeteriaGrants,permittedStudent,activeStudent,getOrCreateAccount,makePermanentCard,makeQrToken,readQrToken,audit} from '../../../lib/fushati/core';
 export const dynamic='force-dynamic';
@@ -361,11 +362,12 @@ export async function POST(req:Request){
   }
   if(op==='create-menu'){
    if(!isCafeStaff(access))return err('غير مسموح',403);
-   const v=parse(data,z.object({cafeteriaId:id,name,category:z.string().trim().min(1).max(70),price:cash.optional()}));
+   const v=parse(data,z.object({cafeteriaId:id,name,category:z.string().trim().min(1).max(70),price:cash.optional(),barcode:z.string().max(80).optional()}));
+   const barcode=normalizeBarcode(v.barcode||'')||null;if(barcode){const problem=barcodeProblem(barcode);if(problem)return err(barcodeMessage(problem,'ar'),400);}
    const manage=await permittedCafeteria(access,v.cafeteriaId,false,'menu_manage'),cafe=manage||await permittedCafeteria(access,v.cafeteriaId,false,'menu_propose');if(!cafe)return err('المقصف غير متاح',403);
    const price=manage?moneyMinor(v.price??'0'):0;
    if(price===null||price>1000000)return err('السعر غير صحيح',400);
-   const newId=crypto.randomUUID();await db().prepare('INSERT INTO fushati_menu_items(id,cafeteria_id,name,category,price_minor,active,available,created_by,created_at) VALUES(?,?,?,?,?,?,?,?,?)').bind(newId,cafe.id,v.name,v.category,price,manage&&price>0?1:0,1,access.userId,now()).run();
+   const newId=crypto.randomUUID();try{await db().prepare('INSERT INTO fushati_menu_items(id,cafeteria_id,name,category,price_minor,active,available,created_by,created_at,barcode) VALUES(?,?,?,?,?,?,?,?,?,?)').bind(newId,cafe.id,v.name,v.category,price,manage&&price>0?1:0,1,access.userId,now(),barcode).run();}catch(error){if(/UNIQUE/i.test(String((error as Error)?.message)))return err('هذا الباركود مسجل لمنتج آخر في هذا المقصف',409);throw error;}
    await audit(access.userId,op,'menu',newId);return response({ok:true,id:newId,pending:!manage});
   }
   if(op==='stock-adjust'){
@@ -391,10 +393,11 @@ export async function POST(req:Request){
    await audit(access.userId,op,'menu',v.id);return response({ok:true});
   }
   if(op==='edit-menu'){
-   const v=parse(data,z.object({id,name,category:z.string().trim().min(1).max(70),price:cash,active:flag,available:flag}));
+   const v=parse(data,z.object({id,name,category:z.string().trim().min(1).max(70),price:cash,active:flag,available:flag,barcode:z.string().max(80).optional()}));
+   const barcodeGiven=v.barcode!==undefined,barcode=barcodeGiven?(normalizeBarcode(v.barcode)||null):null;if(barcode){const problem=barcodeProblem(barcode);if(problem)return err(barcodeMessage(problem,'ar'),400);}
    const price=moneyMinor(v.price);if(price===null||price>1000000||v.active&&price===0)return err('حدد سعراً صحيحاً قبل تفعيل المنتج',400);
    const row=await db().prepare('SELECT id,cafeteria_id FROM fushati_menu_items WHERE id=?').bind(v.id).first<{id:string;cafeteria_id:string}>();if(!row)return err('المنتج غير موجود',404);if(!await permittedCafeteria(access,row.cafeteria_id,true,'menu_manage'))return err('المنتج غير متاح',403);
-   await db().prepare('UPDATE fushati_menu_items SET name=?,category=?,price_minor=?,active=?,available=? WHERE id=?').bind(v.name,v.category,price,v.active?1:0,v.available?1:0,v.id).run();
+   try{await db().prepare(barcodeGiven?'UPDATE fushati_menu_items SET name=?,category=?,price_minor=?,active=?,available=?,barcode=? WHERE id=?':'UPDATE fushati_menu_items SET name=?,category=?,price_minor=?,active=?,available=? WHERE id=?').bind(...(barcodeGiven?[v.name,v.category,price,v.active?1:0,v.available?1:0,barcode,v.id]:[v.name,v.category,price,v.active?1:0,v.available?1:0,v.id])).run();}catch(error){if(/UNIQUE/i.test(String((error as Error)?.message)))return err('هذا الباركود مسجل لمنتج آخر في هذا المقصف',409);throw error;}
    await audit(access.userId,op,'menu',v.id);return response({ok:true});
   }
   if(op==='review-transfer'){
