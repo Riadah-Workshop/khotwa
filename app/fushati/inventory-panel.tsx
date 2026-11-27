@@ -1,7 +1,7 @@
 'use client';
 import {useEffect, useRef, useState} from 'react';
 import type {FormEvent, ReactNode} from 'react';
-import {Boxes, Check, ClipboardList, Clock, History, PackagePlus, RefreshCw, Search, Settings, Trash2, TriangleAlert, Undo2, Warehouse, X} from 'lucide-react';
+import {Boxes, Check, ClipboardList, Clock, History, PackagePlus, RefreshCw, ScanBarcode, Search, Settings, Trash2, TriangleAlert, Undo2, Warehouse, X} from 'lucide-react';
 import '../ui/kx.css';
 import './panels.css';
 import {Badge, Card, Empty, Notice, Stat, cx} from '../ui/kx';
@@ -28,7 +28,7 @@ async function post(op: string, data: unknown) {
   return body;
 }
 
-export default function InventoryPanel({cafeteriaId, language}: {cafeteriaId: string; language: 'ar' | 'en'}) {
+export default function InventoryPanel({cafeteriaId, language, onScan}: {cafeteriaId: string; language: 'ar' | 'en'; onScan?: () => void}) {
   const en = language === 'en';
   const t = (ar: string, english: string) => (en ? english : ar);
   const [reload, setReload] = useState(0);
@@ -144,7 +144,7 @@ export default function InventoryPanel({cafeteriaId, language}: {cafeteriaId: st
     </div>
 
     <Card tone="teal" icon={<Warehouse size={18}/>} title={t('المنتجات والكميات', 'Items and quantities')} description={t('الأحوج إلى إجراء أولاً. المنتجات التي لا تُتبع كميتها تبقى متاحة للبيع دون قيد.', 'Items that need action come first. Items without tracking stay available for sale without a limit.')}
-      actions={<button type="button" className="kx-btn is-small" onClick={() => setReload(n => n + 1)} disabled={loading}><RefreshCw size={16} className={loading ? 'kx-spin' : undefined}/><span className="kx-btn-text">{t('تحديث', 'Refresh')}</span></button>}>
+      actions={<>{onScan && canManage && <button type="button" className="kx-btn is-small is-solid" data-tone="amber" onClick={onScan}><ScanBarcode size={16} aria-hidden="true"/><span className="kx-btn-text">{t('استلام بالباركود', 'Receive by barcode')}</span></button>}<button type="button" className="kx-btn is-small" onClick={() => setReload(n => n + 1)} disabled={loading}><RefreshCw size={16} className={loading ? 'kx-spin' : undefined}/><span className="kx-btn-text">{t('تحديث', 'Refresh')}</span></button></>}>
       <div className="cfi-filters">
         <div className="cfi-chips" role="group" aria-label={t('تصفية المنتجات', 'Filter items')}>
           {([['all', t('الكل', 'All'), items.length], ['attention', t('يحتاج إجراء', 'Needs action'), attention], ['untracked', t('غير متتبع', 'Not tracked'), summary.untracked]] as Array<[Filter, string, number]>).map(([id, label, count]) =>

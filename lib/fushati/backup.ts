@@ -10,7 +10,7 @@ export const BACKUP_TABLES: Record<string, {include: string[]; leftOut: string[]
   fushati_cafeterias: {include: ['id', 'school_id', 'name', 'alias', 'bank_name', 'iban', 'beneficiary', 'active', 'latitude', 'longitude', 'arrival_radius_m', 'created_at'], leftOut: []},
   fushati_users: {include: ['id', 'email', 'login_identifier', 'full_name', 'phone', 'role', 'active', 'must_change_password', 'session_version', 'activated_at', 'created_at'], leftOut: ['password_hash']},
   fushati_assignments: {include: ['user_id', 'cafeteria_id', 'permissions'], leftOut: []},
-  fushati_menu_items: {include: ['id', 'cafeteria_id', 'name', 'category', 'price_minor', 'active', 'available', 'created_by', 'created_at'], leftOut: []},
+  fushati_menu_items: {include: ['id', 'cafeteria_id', 'name', 'category', 'price_minor', 'active', 'available', 'created_by', 'created_at', 'barcode'], leftOut: []},
   fushati_inventory: {include: ['menu_item_id', 'tracked', 'on_hand', 'low_stock_threshold', 'cost_minor', 'updated_at'], leftOut: []},
   fushati_stock_movements: {include: ['id', 'menu_item_id', 'delta', 'reason', 'kind', 'note', 'unit_cost_minor', 'reference_id', 'actor_id', 'created_at'], leftOut: []},
   fushati_accounts: {include: ['id', 'school_id', 'cafeteria_id', 'student_id', 'balance_minor', 'daily_limit_minor', 'monthly_limit_minor', 'allowed_item_ids', 'active', 'spent_day_minor', 'spent_month_minor', 'day_key', 'month_key', 'created_at'], leftOut: ['card_nonce']},

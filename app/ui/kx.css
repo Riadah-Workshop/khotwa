@@ -148,6 +148,24 @@
 .kx-tour-dots i.on{background:var(--kx-accent-solid);width:22px;border-radius:6px}
 .kx-tour-foot{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap}
 .kx-tour-foot .kx-btn-row{margin-inline-start:auto}
+/* Editor view: a screen to add or change something, shown in place of the list (never over it) */
+.kx-editor{display:grid;gap:14px;width:100%;max-width:1000px;margin-inline:auto}
+.kx-editor-head{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--kx-card);border:1px solid var(--kx-border);border-radius:var(--kx-radius);box-shadow:var(--kx-shadow);padding:14px 16px}
+.kx-editor-title{flex:1 1 220px;min-width:0}
+.kx-editor-title h2{margin:0;font-size:19px;line-height:1.35;color:var(--kx-text)}
+.kx-editor-title h2:focus{outline:none}
+.kx-editor-title p{margin:3px 0 0;color:var(--kx-muted);max-width:70ch}
+.kx-editor-body{background:var(--kx-card);border:1px solid var(--kx-border);border-radius:var(--kx-radius);box-shadow:var(--kx-shadow);padding:18px}
+.kx-editor-bar{position:sticky;inset-block-end:0;z-index:6;display:flex;gap:10px;flex-wrap:wrap;align-items:center;background:var(--kx-card);border:1px solid var(--kx-border);border-radius:var(--kx-radius);box-shadow:0 -8px 22px rgba(15,40,30,.1);padding:12px 16px}
+.kx-editor-bar .kx-btn{flex:0 1 auto}
+.kx-flip:dir(rtl),[dir=rtl] .kx-flip{transform:scaleX(-1)}
+/* Inline confirmation: replaces the "are you sure?" popup */
+.kx-confirm{display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 10px;border-radius:12px;background:var(--kx-red-bg);border:1px solid var(--kx-red-line);color:var(--kx-red-ink);font-weight:600;font-size:14px}
+.kx-confirm.is-wide{display:flex;padding:10px 14px}
+.kx-confirm.is-wide>span{flex:1 1 240px}
+.kx-confirm .kx-btn:not(.is-solid){background:#fff;color:var(--kx-text);border-color:var(--kx-border)}
+@media (max-width:640px){.kx-editor-head{padding:12px}.kx-editor-body{padding:14px}.kx-editor-bar .kx-btn{flex:1 1 140px}}
+@media print{.kx-editor-bar,.kx-editor-head .kx-btn{display:none}}
 @media (prefers-reduced-motion:reduce){.kx-tour-spot{transition:none}.kx-btn{transition:none}.kx-scope .kx-spin{animation:none}}
 
 @media (max-width:900px){.kx-grid.cols-3,.kx-grid.cols-4{grid-template-columns:repeat(2,minmax(0,1fr))}}

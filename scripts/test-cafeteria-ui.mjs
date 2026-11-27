@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Cafeteria screens: inventory helpers (app/fushati/stock-ui.ts) and report helpers (app/fushati/report-ui.ts).
+// Cafeteria screens: inventory helpers (app/fushati/stock-ui.ts), report helpers (app/fushati/report-ui.ts) and the scan-a-barcode / product list helpers (app/fushati/scan-ui.ts).
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import ts from 'typescript';
@@ -11,6 +11,7 @@ function load(file) {
 }
 const s = load('app/fushati/stock-ui.ts');
 const r = load('app/fushati/report-ui.ts');
+const b = load('app/fushati/scan-ui.ts');
 
 const item = (over) => ({id: 'x', name: 'عصير', category: 'مشروبات', priceMinor: 300, active: true, available: true, tracked: true, onHand: 10, threshold: 5, costMinor: 200, updatedAt: '', sold30d: 0, status: 'ok', ...over});
 
@@ -125,4 +126,54 @@ assert.ok(!r.reportUrl('x&y', 'a b', '2026-11-01', '2026-11-26').includes('x&y')
   assert.equal(r.headline({columns: [col('name', 'text')], totals: {name: 'x'}}), null);
 }
 for (const group of r.GROUPS) assert.ok(group.label.ar && group.label.en && group.description.ar && group.description.en);
-console.log('ok: cafeteria inventory and report helpers');
+// --- scan a barcode: the quantity a person types -------------------------------------------------------
+assert.equal(b.quantityInput('24'), 24);
+assert.equal(b.quantityInput(' ١٢ '), 12, 'Arabic digits are read');
+assert.equal(b.quantityInput('۳۶'), 36, 'Persian digits are read');
+assert.equal(b.quantityInput('1,200'), 1200, 'a thousands separator is ignored');
+assert.equal(b.quantityInput('100000'), 100000);
+for (const bad of ['', '0', '-3', '2.5', '100001', 'abc', '1e3', '١٢٣٤٥٦٧']) assert.equal(b.quantityInput(bad), null, `"${bad}" is not a quantity`);
+
+// --- a price or cost ---------------------------------------------------------------------------------------
+assert.equal(b.amountInput(''), '', 'empty is allowed: the price is optional');
+assert.equal(b.amountInput('  '), '');
+assert.equal(b.amountInput('2.5'), '2.5');
+assert.equal(b.amountInput('١٢٫٥٠'), '12.50', 'an Arabic decimal mark is read');
+assert.equal(b.amountInput('3,5'), '3.5', 'a decimal comma is read');
+for (const bad of ['abc', '1.234', '-1', '1.', '.5', '123456']) assert.equal(b.amountInput(bad), null, `"${bad}" is not an amount`);
+
+// --- the line shown after saving -----------------------------------------------------------------------------------
+{
+  const base = {created: false, pending: false, name: 'عصير', received: 0, onHand: null, duplicate: false};
+  assert.equal(b.savedMessage({...base, received: 24, onHand: 30}, true), 'عصير: +24 added, 30 in stock now.');
+  assert.ok(b.savedMessage({...base, received: 24, onHand: 30}, false).includes('أُضيف 24'));
+  assert.ok(b.savedMessage({...base, created: true, pending: true}, true).includes('approve'), 'a proposed product says it waits for approval');
+  assert.ok(b.savedMessage({...base, created: true, received: 5, onHand: 5}, true).includes('on sale'), 'a manager’s product is on sale at once');
+  assert.ok(b.savedMessage({...base, duplicate: true, received: 24}, true).includes('already saved'), 'a repeated scan says nothing was added twice');
+  assert.ok(!b.savedMessage({...base, duplicate: true, received: 24}, true).includes('+24'));
+  assert.ok(b.savedMessage(base, true).includes('no quantity'));
+}
+
+// --- a new product ---------------------------------------------------------------------------------------------------------
+assert.ok(b.newProductProblem({name: ' ', price: '', canPrice: true}, true), 'a name is needed');
+assert.ok(b.newProductProblem({name: 'X', price: '', canPrice: true}, false), 'one letter is too short');
+assert.equal(b.newProductProblem({name: 'Cola', price: '', canPrice: true}, true), null, 'the price can wait');
+assert.equal(b.newProductProblem({name: 'Cola', price: '2.50', canPrice: true}, true), null);
+assert.ok(b.newProductProblem({name: 'Cola', price: 'two', canPrice: true}, true), 'a wrong price is refused');
+assert.equal(b.newProductProblem({name: 'Cola', price: 'two', canPrice: false}, true), null, 'someone who cannot price is not asked about the price');
+
+// --- the product list: state, search and filter -------------------------------------------------------------------
+{
+  const row = (name, over) => ({name, category: 'مشروبات', barcode: null, active: 1, available: 1, ...over});
+  const rows = [row('Cola', {barcode: '5449000000996'}), row('Water', {available: 0}), row('Chips', {active: 0, category: 'وجبات خفيفة'}), row('عصير برتقال', {barcode: '6281000000014'})];
+  assert.deepEqual(rows.map(b.productState), ['sale', 'off', 'pending', 'sale']);
+  assert.equal(b.filterProducts(rows, '', 'all').length, 4);
+  assert.deepEqual(b.filterProducts(rows, '', 'sale').map(x => x.name), ['Cola', 'عصير برتقال']);
+  assert.deepEqual(b.filterProducts(rows, '', 'pending').map(x => x.name), ['Chips']);
+  assert.deepEqual(b.filterProducts(rows, '5449', 'all').map(x => x.name), ['Cola'], 'a barcode finds its product');
+  assert.deepEqual(b.filterProducts(rows, '٦٢٨١', 'all').map(x => x.name), ['عصير برتقال'], 'a barcode typed in Arabic digits finds it too');
+  assert.deepEqual(b.filterProducts(rows, 'wat', 'all').map(x => x.name), ['Water'], 'the name is matched without regard to case');
+  assert.deepEqual(b.filterProducts(rows, 'خفيفة', 'all').map(x => x.name), ['Chips'], 'the category is searched');
+  assert.deepEqual(b.filterProducts(rows, 'cola', 'off'), [], 'search and state both apply');
+}
+console.log('ok: cafeteria inventory, report and barcode-scan helpers');

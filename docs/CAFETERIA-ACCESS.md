@@ -126,3 +126,28 @@ exported by accident.
 **Retention of agent positions.** A finished stay keeps its times, distance and reason; its coordinates are blanked
 30 days after it ended (`POSITION_RETENTION_DAYS`). A stay whose phone went silent is first closed at its last
 report. There is no scheduled job in this deployment, so this runs when an agent checks in; it is safe to repeat.
+
+## Products by barcode
+
+Code: `lib/fushati/barcode.ts` (rules), `app/api/fushati/inventory/route.ts` (`op=barcode`, `op=scan`), `app/fushati/scan-panel.tsx`,
+`app/fushati/menu-panel.tsx`, migration `0032`. Tests: `scripts/test-cafeteria-barcode.mjs`, `test-cafeteria-ui.mjs`.
+
+A product can carry the barcode printed on the item (`fushati_menu_items.barcode`, 4 to 32 letters and digits, unique
+within a cafeteria, shared freely across cafeterias). The scan screen reads it with a USB or Bluetooth scanner (they type
+the code and press Enter), the phone camera (`@zxing/browser`), or the keyboard.
+
+- **A barcode the cafeteria already knows** needs only the quantity: `op=scan` with the quantity records a *receipt*, so
+  the history, the cost price and the "same request sent twice counts once" rule are those of every other stock movement.
+  A product that was not tracked starts being tracked with this first quantity.
+- **A new barcode** asks once for the name (and the price, for those who may set one) and creates the product; every later
+  scan is quantity-only. A proposer (`menu_propose` without `menu_manage`) creates the product at price 0, not for sale,
+  waiting for the administrator, exactly as when adding by hand; the price a proposer sends is ignored.
+- **Permissions.** Looking a barcode up needs any of `menu_propose`, `menu_manage`, `inventory_view`,
+  `inventory_manage` in that cafeteria and answers with what the person may do (`can.create/price/stock/viewStock`);
+  adding quantity needs `inventory_manage`. A proposer who is not allowed to add stock still gets the product created, and
+  the answer says the stock part was refused (`stock_forbidden`).
+- **Check digit.** An all-digit code of length 8, 12, 13 or 14 must have a valid GS1 check digit, which catches most
+  mis-scans; other codes (shorter, longer, with letters) are accepted as they are.
+- **No online product lookup.** Product names are not fetched from a public database, because that would send the
+  cafeteria's barcodes to a third party. The name is typed once per product.
+- **Backup.** `barcode` is in the included columns of `fushati_menu_items`.
