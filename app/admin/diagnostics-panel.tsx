@@ -76,8 +76,11 @@ export default function DiagnosticsPanel({lang, active}: Props) {
     }
   }, [solved]);
 
+  // The load is queued, never a synchronous state change inside the effect.
   useEffect(() => {
-    if (active) void load();
+    if (!active) return undefined;
+    const first = setTimeout(() => void load(), 0);
+    return () => clearTimeout(first);
   }, [active, load]);
 
   async function send(op: string, payload: Record<string, unknown> = {}): Promise<boolean> {

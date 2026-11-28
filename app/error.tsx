@@ -1,6 +1,7 @@
 'use client';
 // What a person sees when a screen crashes, instead of a blank page. The crash is also reported (without anything the
 // person typed or saw) so the system administrator can see it in Diagnostics.
+import Link from 'next/link';
 import {useEffect} from 'react';
 import {reportIssue} from './native/report-client';
 
@@ -21,9 +22,9 @@ export default function ErrorPage({error, reset}: {error: Error & {digest?: stri
         <button type="button" onClick={() => reset()}>
           <span lang="ar" dir="rtl">إعادة المحاولة</span> · <span lang="en" dir="ltr">Try again</span>
         </button>
-        <a href="/">
+        <Link href="/">
           <span lang="ar" dir="rtl">الصفحة الرئيسية</span> · <span lang="en" dir="ltr">Home</span>
-        </a>
+        </Link>
       </div>
     </main>
   );
