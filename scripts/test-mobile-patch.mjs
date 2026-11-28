@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {readFileSync, readdirSync, statSync} from 'node:fs';
 import {join} from 'node:path';
 import {
-  ANDROID_PERMISSIONS, IOS_USAGE_TEXTS, missingFromManifest, patchAndroidGradle, patchAndroidManifest, patchAndroidStrings,
+  ANDROID_PERMISSIONS, IOS_DEPLOYMENT_TARGET, IOS_USAGE_TEXTS, missingFromManifest, patchIosDeploymentTarget, patchPodfile, patchAndroidGradle, patchAndroidManifest, patchAndroidStrings,
   patchInfoPlist, patchIosProject, versionCodeFor,
 } from '../mobile/scripts/patch.mjs';
 import {SCAN_FORMATS, classifyScanError, firstBarcode} from '../lib/fushati/native-scan.ts';
@@ -102,6 +102,16 @@ check('the Xcode project gets the marketing version and a build number', () => {
   assert.equal((out.match(/MARKETING_VERSION = 1.4.2;/g) || []).length, 2);
   assert.equal((out.match(/CURRENT_PROJECT_VERSION = 1004002;/g) || []).length, 2);
   assert.throws(() => patchIosProject('nothing', '1.0.0', '1'), /MARKETING_VERSION/);
+});
+check('the Podfile and the Xcode project ask for an iOS new enough for the scanner', () => {
+  const podfile = "require_relative '../../node_modules/@capacitor/ios/scripts/pods_helpers'\n\nplatform :ios, '15.0'\nuse_frameworks!\n";
+  assert.match(patchPodfile(podfile), new RegExp(`platform :ios, '${IOS_DEPLOYMENT_TARGET}'`));
+  assert.equal(patchPodfile(patchPodfile(podfile)), patchPodfile(podfile));
+  assert.throws(() => patchPodfile('use_frameworks!'), /platform :ios/);
+  const project = 'IPHONEOS_DEPLOYMENT_TARGET = 15.0;\nIPHONEOS_DEPLOYMENT_TARGET = 15.0;';
+  assert.equal((patchIosDeploymentTarget(project).match(new RegExp(`IPHONEOS_DEPLOYMENT_TARGET = ${IOS_DEPLOYMENT_TARGET};`, 'g')) || []).length, 2);
+  assert.throws(() => patchIosDeploymentTarget('nothing'), /IPHONEOS_DEPLOYMENT_TARGET/);
+  assert.ok(Number.parseFloat(IOS_DEPLOYMENT_TARGET) >= 15.5, 'ML Kit 8 needs at least iOS 15.5');
 });
 check('the built-manifest check names exactly what is missing', () => {
   assert.deepEqual(missingFromManifest(patchAndroidManifest(manifest) + 'BackgroundGeolocationService'), []);

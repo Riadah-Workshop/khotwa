@@ -4,7 +4,7 @@
 import {existsSync, readFileSync, writeFileSync} from 'node:fs';
 import {dirname, join} from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {patchAndroidGradle, patchAndroidManifest, patchAndroidStrings, patchInfoPlist, patchIosProject, versionCodeFor} from './patch.mjs';
+import {patchAndroidGradle, patchAndroidManifest, patchAndroidStrings, patchInfoPlist, patchIosDeploymentTarget, patchIosProject, patchPodfile, versionCodeFor} from './patch.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const platform = process.argv[2];
@@ -26,7 +26,8 @@ if (platform === 'android') {
   console.log(`Android version ${version} (code ${versionCodeFor(version)})`);
 } else if (platform === 'ios') {
   edit('ios/App/App/Info.plist', patchInfoPlist);
-  edit('ios/App/App.xcodeproj/project.pbxproj', (text) => patchIosProject(text, version, process.env.KHOTWA_BUILD || String(versionCodeFor(version))));
+  edit('ios/App/Podfile', patchPodfile);
+  edit('ios/App/App.xcodeproj/project.pbxproj', (text) => patchIosDeploymentTarget(patchIosProject(text, version, process.env.KHOTWA_BUILD || String(versionCodeFor(version)))));
   console.log(`iOS version ${version}`);
 } else {
   console.error('Usage: node scripts/prepare.mjs android|ios');

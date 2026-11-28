@@ -102,6 +102,25 @@ export function patchIosProject(pbxproj, version, build) {
   return out;
 }
 
+/** The oldest iOS the app runs on. Google's ML Kit scanner needs more than Capacitor's default, and CocoaPods refuses to install without it. */
+export const IOS_DEPLOYMENT_TARGET = '16.0';
+
+/** iOS: the Podfile's minimum iOS version. */
+export function patchPodfile(text, target = IOS_DEPLOYMENT_TARGET) {
+  let hits = 0;
+  const out = text.replace(/^(\s*)platform :ios, '[^']*'/m, (_match, space) => { hits += 1; return `${space}platform :ios, '${target}'`; });
+  if (!hits) throw new Error("Podfile has no \"platform :ios, '...'\" line");
+  return out;
+}
+
+/** iOS: the same minimum version inside the Xcode project, which must not be lower than the Podfile's. */
+export function patchIosDeploymentTarget(pbxproj, target = IOS_DEPLOYMENT_TARGET) {
+  let hits = 0;
+  const out = pbxproj.replace(/IPHONEOS_DEPLOYMENT_TARGET = [^;]+;/g, () => { hits += 1; return `IPHONEOS_DEPLOYMENT_TARGET = ${target};`; });
+  if (!hits) throw new Error('project.pbxproj has no IPHONEOS_DEPLOYMENT_TARGET to update');
+  return out;
+}
+
 /** What is missing from a built (merged) Android manifest; an empty list means the app can do everything the website asks. */
 export function missingFromManifest(xml) {
   return ANDROID_REQUIRED.filter((needle) => !xml.includes(needle));

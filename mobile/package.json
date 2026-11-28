@@ -6,7 +6,7 @@
   "scripts": {
     "www": "node scripts/build-www.mjs",
     "add:android": "node scripts/build-www.mjs && cap add android && node scripts/prepare.mjs android",
-    "add:ios": "node scripts/build-www.mjs && cap add ios --packagemanager CocoaPods && node scripts/prepare.mjs ios",
+    "add:ios": "node scripts/build-www.mjs && node scripts/add-ios.mjs",
     "sync": "node scripts/build-www.mjs && cap sync",
     "verify:android": "node scripts/verify.mjs android"
   },
