@@ -54,6 +54,8 @@ for(const name of files){
 const OWN_PROTECTION={
  'account/profile/route.ts':'gateway: Student Affairs Agent only; edits that account only',
  'admin/route.ts':'gateway and route: system administrator only',
+ 'admin/diagnostics/route.ts':'gateway and route: system administrator only',
+ 'app/report/route.ts':'every signed-in role may send a problem report, the read-only manager included; it carries no school data and only adds to the diagnostics counters',
  'fushati/receipts/route.ts':'cafeteria roles are checked inside the route',
  'fushati/inventory/route.ts':'stock changes need the inventory_manage permission in the item\'s own cafeteria, checked inside the route; the gateway keeps managers out of this path',
  'fushati/presence/route.ts':'only cafeteria agents write attendance and only the system administrator or a cafeteria administrator write the rest; each operation checks its role inside the route',

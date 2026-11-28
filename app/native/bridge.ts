@@ -92,3 +92,96 @@ export async function watchPosition(
   );
   return () => navigator.geolocation.clearWatch(handle);
 }
+
+// ---- the phone's own state (for diagnostics) -----------------------------------------------------------------------
+
+export type PermissionState = 'granted' | 'denied' | 'prompt' | 'unsupported' | 'unknown';
+export type DeviceSnapshot = {
+  osVersion: string;
+  deviceModel: string;
+  location: PermissionState;
+  backgroundLocation: PermissionState;
+  notifications: PermissionState;
+  camera: PermissionState;
+  batterySaver: 'on' | 'off' | 'unknown';
+};
+
+const toState = (value: unknown): PermissionState => (value === 'granted' ? 'granted' : value === 'denied' ? 'denied' : value === 'prompt' || value === 'prompt-with-rationale' ? 'prompt' : 'unknown');
+
+/** A native plugin's own answer to "may I?", or null when the plugin is not in the app. */
+async function nativeState(name: string, key: string): Promise<PermissionState | null> {
+  const found = plugin(name);
+  if (!found || typeof found.checkPermissions !== 'function') return null;
+  try {
+    return toState(((await found.checkPermissions()) as Record<string, unknown> | undefined)?.[key]);
+  } catch {
+    return null;
+  }
+}
+
+async function browserState(name: string): Promise<PermissionState> {
+  try {
+    if (typeof navigator === 'undefined' || !navigator.permissions?.query) return 'unsupported';
+    return toState((await navigator.permissions.query({name: name as PermissionName})).state);
+  } catch {
+    return 'unsupported';
+  }
+}
+
+/**
+ * Whether the phone allows what the account needs, and which phone it is. No position is read, no photo is taken, and
+ * nothing identifies the device: only the permission answers, the system version and the model name.
+ * Background location and the battery saver are not readable from the web view, so they stay 'unknown' until the app
+ * shell reports them.
+ */
+export async function deviceSnapshot(): Promise<DeviceSnapshot> {
+  const info = (await plugin('Device')?.getInfo?.().catch(() => null)) as {model?: string; osVersion?: string; operatingSystem?: string} | null | undefined;
+  const [location, camera, notifications] = await Promise.all([
+    nativeState('Geolocation', 'location').then((state) => state ?? browserState('geolocation')),
+    nativeState('BarcodeScanner', 'camera').then((state) => state ?? browserState('camera')),
+    nativeState('LocalNotifications', 'display').then((state) => state ?? browserState('notifications')),
+  ]);
+  return {
+    osVersion: info?.osVersion ? `${info.operatingSystem === 'ios' ? 'iOS' : 'Android'} ${info.osVersion}` : '',
+    deviceModel: info?.model ?? '',
+    location,
+    backgroundLocation: 'unknown',
+    notifications,
+    camera,
+    batterySaver: 'unknown',
+  };
+}
+
+/** Opens an address outside the app (the store page, a download). Falls back to a new tab in a browser. */
+export function openExternal(url: string): void {
+  if (!/^https:\/\//i.test(url)) return;
+  const browser = plugin('Browser');
+  if (browser?.open) {
+    void browser.open({url}).catch(() => window.open(url, '_blank', 'noopener'));
+    return;
+  }
+  window.open(url, '_blank', 'noopener');
+}
+
+/**
+ * Starts the update. On Android from Google Play the update downloads and installs inside the app; on iOS, or when the app
+ * was installed another way (a file), the store page or download address from the release is opened instead.
+ */
+export async function startNativeUpdate(storeUrl: string): Promise<void> {
+  const updater = plugin('AppUpdate');
+  if (updater) {
+    try {
+      if (nativePlatform() === 'android' && typeof updater.performImmediateUpdate === 'function') {
+        await updater.performImmediateUpdate();
+        return;
+      }
+      if (typeof updater.openAppStore === 'function') {
+        await updater.openAppStore();
+        return;
+      }
+    } catch {
+      // not installed from the store, or the store has nothing newer yet: use the address the administrator gave
+    }
+  }
+  if (storeUrl) openExternal(storeUrl);
+}

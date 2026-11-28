@@ -53,14 +53,8 @@ export function maskPhone(phone: string): string {
   return digits.length <= 7 ? digits : `${digits.slice(0, 6)}•••${digits.slice(-4)}`;
 }
 
-/** The latest stamps, newest first, with a readable name for each. For the system administrator only. */
-export async function recentStamps(db: D1Database, options: {days?: number; role?: string; limit?: number; nowMs?: number} = {}): Promise<StampView[]> {
-  const days = Math.min(STAMP_RETENTION_DAYS, Math.max(1, Math.floor(options.days ?? 7)));
-  const limit = Math.min(500, Math.max(1, Math.floor(options.limit ?? 200)));
-  const since = new Date((options.nowMs ?? Date.now()) - days * 86_400_000).toISOString();
-  const rows = options.role && ROLES.has(options.role)
-    ? (await db.prepare('SELECT * FROM khotwa_login_stamps WHERE signed_in_at>=? AND role=? ORDER BY signed_in_at DESC LIMIT ?').bind(since, options.role, limit).all<StampRow>()).results
-    : (await db.prepare('SELECT * FROM khotwa_login_stamps WHERE signed_in_at>=? ORDER BY signed_in_at DESC LIMIT ?').bind(since, limit).all<StampRow>()).results;
+/** Readable names for accounts, looked up in a few queries. Parents are masked, the system administrator has no name. */
+export async function labelAccounts(db: D1Database, rows: {role: string; account_key: string; school_id: string}[]): Promise<{name: (row: {role: string; account_key: string}) => string; school: (row: {school_id: string}) => string}> {
   const accountIds = [...new Set(rows.filter((row) => row.role === 'deputy' || row.role === 'manager').map((row) => row.account_key))];
   const fushatiIds = [...new Set(rows.filter((row) => row.role === 'fushati_admin' || row.role === 'fushati_agent').map((row) => row.account_key))];
   const schoolIds = [...new Set(rows.map((row) => row.school_id).filter(Boolean))];
@@ -69,11 +63,26 @@ export async function recentStamps(db: D1Database, options: {days?: number; role
   if (accountIds.length) for (const row of (await db.prepare('SELECT id,full_name FROM khotwa_accounts WHERE id IN (SELECT value FROM json_each(?))').bind(JSON.stringify(accountIds)).all<{id: string; full_name: string}>()).results) names.set(row.id, row.full_name);
   if (fushatiIds.length) for (const row of (await db.prepare('SELECT id,full_name FROM fushati_users WHERE id IN (SELECT value FROM json_each(?))').bind(JSON.stringify(fushatiIds)).all<{id: string; full_name: string}>()).results) names.set(row.id, row.full_name);
   if (schoolIds.length) for (const row of (await db.prepare('SELECT id,name FROM khotwa_schools WHERE id IN (SELECT value FROM json_each(?))').bind(JSON.stringify(schoolIds)).all<{id: string; name: string}>()).results) schools.set(row.id, row.name);
+  return {
+    name: (row) => (row.role === 'parent' ? maskPhone(row.account_key) : row.role === 'main_admin' ? '' : names.get(row.account_key) ?? ''),
+    school: (row) => schools.get(row.school_id) ?? '',
+  };
+}
+
+/** The latest stamps, newest first, with a readable name for each. For the system administrator only. */
+export async function recentStamps(db: D1Database, options: {days?: number; role?: string; limit?: number; nowMs?: number} = {}): Promise<StampView[]> {
+  const days = Math.min(STAMP_RETENTION_DAYS, Math.max(1, Math.floor(options.days ?? 7)));
+  const limit = Math.min(500, Math.max(1, Math.floor(options.limit ?? 200)));
+  const since = new Date((options.nowMs ?? Date.now()) - days * 86_400_000).toISOString();
+  const rows = options.role && ROLES.has(options.role)
+    ? (await db.prepare('SELECT * FROM khotwa_login_stamps WHERE signed_in_at>=? AND role=? ORDER BY signed_in_at DESC LIMIT ?').bind(since, options.role, limit).all<StampRow>()).results
+    : (await db.prepare('SELECT * FROM khotwa_login_stamps WHERE signed_in_at>=? ORDER BY signed_in_at DESC LIMIT ?').bind(since, limit).all<StampRow>()).results;
+  const labels = await labelAccounts(db, rows);
   return rows.map((row) => ({
     id: row.id,
     role: row.role,
-    name: row.role === 'parent' ? maskPhone(row.account_key) : row.role === 'main_admin' ? '' : names.get(row.account_key) ?? '',
-    school: schools.get(row.school_id) ?? '',
+    name: labels.name(row),
+    school: labels.school(row),
     at: row.signed_in_at,
     day: row.day_key,
     channel: row.channel,
