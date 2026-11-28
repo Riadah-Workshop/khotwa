@@ -20,3 +20,24 @@
 .admin-more summary{cursor:pointer;color:var(--kx-muted);font-size:13.5px;font-weight:700;padding:4px 0}
 .admin-code{font-size:12.5px;color:var(--kx-muted);overflow-wrap:anywhere}
 @media (max-width:640px){.admin-actions-grid,.admin-cards{grid-template-columns:minmax(0,1fr)}}
+
+/* Diagnostics tab (app/admin/diagnostics-panel.tsx) */
+.diag-checks{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.diag-checks li{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px}
+.diag-checks small{color:var(--kx-muted,#52665f);word-break:break-all}
+.diag-message{margin-top:4px;font-size:13px;line-height:1.5;word-break:break-word}
+.diag-versions,.diag-findings{display:flex;flex-wrap:wrap;gap:6px}
+.diag-versions{margin-bottom:12px}
+.diag-release{display:grid;gap:12px;padding:14px;border:1px solid var(--kx-line,#d9e3de);border-radius:14px}
+.diag-release h4{margin:0;font-size:16px}
+.diag-release h4 small{font-weight:400;opacity:.7}
+.diag-findings .kx-badge{white-space:normal;text-align:start;border-radius:12px}
+/* On a phone the three tables stack: one block per row, each value labelled, so nothing is hidden off to the side. */
+@media (max-width:760px){
+  .diag-stack thead{display:none}
+  .diag-stack,.diag-stack tbody,.diag-stack tr{display:block;width:100%;min-width:0}
+  .diag-stack tr{padding:10px 0;border-bottom:1px solid var(--kx-line,#d9e3de)}
+  .diag-stack td{display:grid;grid-template-columns:minmax(84px,30%) minmax(0,1fr);gap:8px;align-items:start;padding:4px 12px;border:0;text-align:start;white-space:normal}
+  .diag-stack td[data-label]::before{content:attr(data-label);font-weight:700;font-size:12.5px;color:var(--kx-muted,#52665f)}
+  .diag-stack td:first-child{grid-template-columns:minmax(0,1fr);font-weight:600}
+}

@@ -230,7 +230,7 @@ export async function createHarness() {
   }
 
   return {
-    DB, env, tenancy, schools: SCHOOLS, schoolByKey, sessions, seeded, sharedChildren, phones, serve, gate, tables, fushatiIds, addFushati, login,
+    DB, env, tenancy, schools: SCHOOLS, schoolByKey, sessions, seeded, sharedChildren, phones, serve, gate, tables, fushatiIds, addFushati, login, gateway, form,
     async close() { await mf.dispose(); },
   };
 }

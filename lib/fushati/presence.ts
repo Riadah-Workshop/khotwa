@@ -1,16 +1,19 @@
-// Arrival, departure and live position of cafeteria agents (database side).
+// Arrival and departure of cafeteria agents (database side).
 //
-// An agent's position is stored only between arrival and departure, in the open row of fushati_visits.
-// Who may see it is decided by the route (the presence_view permission on that cafeteria); nothing here checks
-// access, so every function takes ids that the caller has already authorised.
+// The agent's phone decides by itself when he reaches or leaves the cafeteria (lib/fushati/location.ts) and reports
+// only those two events. His position is looked at once, on arrival, to refuse a claim made from somewhere else;
+// it is never stored. A stay is one row of fushati_visits with its times, the distance on arrival and the reason it ended.
+//
+// Who may see the stays is decided by the route (the presence_view permission on that cafeteria, never an agent);
+// nothing here checks access, so every function takes ids that the caller has already authorised.
 import {db, now} from './core';
 import {agentContactPhone} from './identifiers';
 import {
-  PING_MIN_INTERVAL_MS,
   POSITION_RETENTION_DAYS,
-  SIGNAL_LOST_MS,
+  STAY_MAX_MS,
   distanceMeters,
   durationMinutes,
+  eventTime,
   hasLeftSpot,
   isAtSpot,
   visitState,
@@ -27,9 +30,6 @@ export type VisitRow = {
   day_key: string;
   arrived_at: string;
   arrive_distance_m: number;
-  last_lat: number | null;
-  last_lng: number | null;
-  last_accuracy_m: number;
   last_seen_at: string;
   left_at: string | null;
   leave_reason: string | null;
@@ -38,30 +38,29 @@ export type VisitRow = {
 export const hasPoint = (cafeteria: CafeteriaPoint): cafeteria is CafeteriaPoint & {latitude: number; longitude: number} =>
   typeof cafeteria.latitude === 'number' && typeof cafeteria.longitude === 'number';
 
-/** The agent's current stay, if he is checked in. */
+/** The agent's current stay, if he is at a cafeteria. */
 export async function openVisit(userId: string): Promise<VisitRow | null> {
   return db().prepare('SELECT * FROM fushati_visits WHERE user_id=? AND left_at IS NULL').bind(userId).first<VisitRow>();
 }
 
 /**
- * A stay whose phone has been silent for too long is over: close it at the last report. Closing at the last report
- * (not now) keeps a dead battery from turning into a ten-hour shift. Returns the stay if it is still open.
+ * A stay with no departure for STAY_MAX_MS is over, but nobody knows when: close it at the last confirmation so a dead
+ * phone cannot turn into a three-day shift. Returns the stay if it is still open.
  */
-export async function closeIfLost(visit: VisitRow | null, nowMs = Date.now()): Promise<VisitRow | null> {
+export async function closeIfUnconfirmed(visit: VisitRow | null, nowMs = Date.now()): Promise<VisitRow | null> {
   if (!visit || visit.left_at) return visit;
-  if (nowMs - Date.parse(visit.last_seen_at) <= SIGNAL_LOST_MS) return visit;
+  if (nowMs - Date.parse(visit.last_seen_at) <= STAY_MAX_MS) return visit;
   await db().prepare("UPDATE fushati_visits SET left_at=last_seen_at,leave_reason='signal_lost' WHERE id=? AND left_at IS NULL").bind(visit.id).run();
   return null;
 }
 
 /**
- * Retention of agent positions: a finished stay keeps its times, distance and reason, and loses its coordinates
- * after POSITION_RETENTION_DAYS. A stay whose phone fell silent is first closed at its last report (the same
- * rule as closeIfLost), so a forgotten open stay cannot keep coordinates forever. There is no scheduled job in
- * this deployment, so this runs when an agent checks in; it is idempotent and reads only what still needs work.
+ * Housekeeping that runs when an agent reports (there is no scheduled job in this deployment): stays nobody ended are
+ * closed, and the coordinates of old stays (kept before positions stopped being stored) are blanked after
+ * POSITION_RETENTION_DAYS. Idempotent, and it reads only what still needs work.
  */
 export async function purgeOldPositions(nowMs: number): Promise<{closed: number; blanked: number}> {
-  const quiet = new Date(nowMs - SIGNAL_LOST_MS).toISOString();
+  const quiet = new Date(nowMs - STAY_MAX_MS).toISOString();
   const cutoff = new Date(nowMs - POSITION_RETENTION_DAYS * 86_400_000).toISOString();
   const [closed, blanked] = await db().batch([
     db().prepare("UPDATE fushati_visits SET left_at=last_seen_at,leave_reason='signal_lost' WHERE left_at IS NULL AND last_seen_at<?").bind(quiet),
@@ -72,83 +71,72 @@ export async function purgeOldPositions(nowMs: number): Promise<{closed: number;
   return {closed: closed.meta.changes, blanked: blanked.meta.changes};
 }
 
-export type CheckInResult =
-  | {ok: true; visitId: string; already: boolean; arrivedAt: string}
+export type ArrivalResult =
+  | {ok: true; visitId: string; already: boolean; arrivedAt: string; movedFrom: string | null}
   | {ok: false; code: 'no_location' | 'too_far'; distanceM: number; radiusM: number};
 
-/** Record an arrival if the reported position is at the cafeteria. */
-export async function checkIn(userId: string, cafeteria: CafeteriaPoint, position: Position): Promise<CheckInResult> {
+/**
+ * Record an arrival if the reported position is at the cafeteria. `reportedAt` is the time the phone saw it (a phone
+ * that was offline reports late); see eventTime for when it is believed.
+ */
+export async function arrive(userId: string, cafeteria: CafeteriaPoint, position: Position, reportedAt?: string | null): Promise<ArrivalResult> {
   const stamp = now();
-  await purgeOldPositions(Date.parse(stamp));
-  const open = await closeIfLost(await openVisit(userId), Date.parse(stamp));
+  const nowMs = Date.parse(stamp);
+  await purgeOldPositions(nowMs);
+  const open = await closeIfUnconfirmed(await openVisit(userId), nowMs);
   if (!hasPoint(cafeteria)) return {ok: false, code: 'no_location', distanceM: 0, radiusM: cafeteria.arrival_radius_m};
   const distanceM = Math.round(distanceMeters(position, {lat: cafeteria.latitude, lng: cafeteria.longitude}));
   if (!isAtSpot(distanceM, cafeteria.arrival_radius_m, position.accuracyM)) {
     return {ok: false, code: 'too_far', distanceM, radiusM: cafeteria.arrival_radius_m};
   }
   if (open && open.cafeteria_id === cafeteria.id) {
-    await refresh(open.id, position, stamp);
-    return {ok: true, visitId: open.id, already: true, arrivedAt: open.arrived_at};
+    // Still the same stay: the phone confirmed he is here.
+    await db().prepare('UPDATE fushati_visits SET last_seen_at=? WHERE id=? AND left_at IS NULL').bind(stamp, open.id).run();
+    return {ok: true, visitId: open.id, already: true, arrivedAt: open.arrived_at, movedFrom: null};
   }
+  const arrivedAt = new Date(eventTime(reportedAt, nowMs)).toISOString();
   const visitId = crypto.randomUUID();
   const statements: D1PreparedStatement[] = [];
   // Arriving at another cafeteria ends the stay at the previous one in the same transaction.
-  if (open) statements.push(db().prepare("UPDATE fushati_visits SET left_at=?,leave_reason='moved' WHERE id=? AND left_at IS NULL").bind(stamp, open.id));
+  if (open) statements.push(db().prepare("UPDATE fushati_visits SET left_at=?,leave_reason='moved',departure_logged_at=? WHERE id=? AND left_at IS NULL").bind(stamp, stamp, open.id));
   statements.push(
     db()
       .prepare(
-        'INSERT INTO fushati_visits(id,user_id,cafeteria_id,day_key,arrived_at,arrive_lat,arrive_lng,arrive_accuracy_m,arrive_distance_m,last_lat,last_lng,last_accuracy_m,last_seen_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)',
+        'INSERT INTO fushati_visits(id,user_id,cafeteria_id,day_key,arrived_at,arrive_lat,arrive_lng,arrive_accuracy_m,arrive_distance_m,last_lat,last_lng,last_accuracy_m,last_seen_at,arrival_logged_at) VALUES(?,?,?,?,?,NULL,NULL,?,?,NULL,NULL,?,?,?)',
       )
-      .bind(
-        visitId, userId, cafeteria.id, dayKey(stamp), stamp,
-        position.lat, position.lng, Math.round(position.accuracyM), distanceM,
-        position.lat, position.lng, Math.round(position.accuracyM), stamp,
-      ),
+      .bind(visitId, userId, cafeteria.id, dayKey(arrivedAt), arrivedAt, Math.round(position.accuracyM), distanceM, Math.round(position.accuracyM), stamp, stamp),
   );
   try {
     await db().batch(statements);
   } catch (error) {
-    // Two check-ins raced: the unique index let one through. The other agent request is the same stay.
+    // Two reports raced: the unique index let one through. The other request is the same stay.
     if (!/UNIQUE constraint/i.test(String(error instanceof Error ? error.message : error))) throw error;
     const winner = await openVisit(userId);
-    if (winner && winner.cafeteria_id === cafeteria.id) return {ok: true, visitId: winner.id, already: true, arrivedAt: winner.arrived_at};
+    if (winner && winner.cafeteria_id === cafeteria.id) return {ok: true, visitId: winner.id, already: true, arrivedAt: winner.arrived_at, movedFrom: null};
     throw error;
   }
-  return {ok: true, visitId, already: false, arrivedAt: stamp};
+  return {ok: true, visitId, already: false, arrivedAt, movedFrom: open ? open.cafeteria_id : null};
 }
 
-async function refresh(visitId: string, position: Position, stamp: string) {
-  await db()
-    .prepare('UPDATE fushati_visits SET last_lat=?,last_lng=?,last_accuracy_m=?,last_seen_at=? WHERE id=? AND left_at IS NULL')
-    .bind(position.lat, position.lng, Math.round(position.accuracyM), stamp, visitId)
-    .run();
-}
+export type DepartureResult = {checkedOut: false} | {checkedOut: true; visitId: string; cafeteriaId: string; leftAt: string; reason: string};
 
-/** Save the latest position of a checked-in agent. */
-export async function recordPing(userId: string, position: Position): Promise<{checkedIn: false} | {checkedIn: true; visit: VisitRow}> {
+/** Record a departure. `position` (if the phone sent one) decides whether it is recorded as "left the area" or as a plain departure. */
+export async function depart(userId: string, position: Position | null, reportedAt?: string | null): Promise<DepartureResult> {
   const stamp = now();
-  const open = await closeIfLost(await openVisit(userId), Date.parse(stamp));
-  if (!open) return {checkedIn: false};
-  // Phones report every few seconds while moving; one stored position per interval is plenty.
-  if (Date.parse(stamp) - Date.parse(open.last_seen_at) >= PING_MIN_INTERVAL_MS) await refresh(open.id, position, stamp);
-  return {checkedIn: true, visit: open};
-}
-
-/** Record a departure. `position` (if the phone sent one) decides whether it is recorded as "left the area". */
-export async function checkOut(userId: string, position: Position | null): Promise<{checkedOut: boolean; leftAt?: string; reason?: string}> {
-  const stamp = now();
-  const open = await closeIfLost(await openVisit(userId), Date.parse(stamp));
+  const nowMs = Date.parse(stamp);
+  const open = await closeIfUnconfirmed(await openVisit(userId), nowMs);
   if (!open) return {checkedOut: false};
   let reason = 'manual';
   if (position) {
     const cafeteria = await db().prepare('SELECT id,latitude,longitude,arrival_radius_m FROM fushati_cafeterias WHERE id=?').bind(open.cafeteria_id).first<CafeteriaPoint>();
     if (cafeteria && hasPoint(cafeteria) && hasLeftSpot(distanceMeters(position, {lat: cafeteria.latitude, lng: cafeteria.longitude}), cafeteria.arrival_radius_m, position.accuracyM)) reason = 'left_area';
   }
-  await db()
-    .prepare('UPDATE fushati_visits SET left_at=?,leave_reason=?,last_lat=?,last_lng=?,last_accuracy_m=?,last_seen_at=? WHERE id=? AND left_at IS NULL')
-    .bind(stamp, reason, position?.lat ?? open.last_lat, position?.lng ?? open.last_lng, Math.round(position?.accuracyM ?? open.last_accuracy_m), stamp, open.id)
-    .run();
-  return {checkedOut: true, leftAt: stamp, reason};
+  // A departure cannot be before the arrival.
+  const leftMs = Math.max(eventTime(reportedAt, nowMs), Date.parse(open.arrived_at));
+  const leftAt = new Date(leftMs).toISOString();
+  const result = await db().prepare('UPDATE fushati_visits SET left_at=?,leave_reason=?,last_seen_at=?,departure_logged_at=? WHERE id=? AND left_at IS NULL').bind(leftAt, reason, stamp, stamp, open.id).run();
+  if ((result.meta?.changes ?? 0) < 1) return {checkedOut: false};
+  return {checkedOut: true, visitId: open.id, cafeteriaId: open.cafeteria_id, leftAt, reason};
 }
 
 /** An administrator closes a stay that the agent forgot to end. */
@@ -171,19 +159,18 @@ export type VisitView = {
   name: string;
   phone: string;
   arrivedAt: string;
+  /** When the departure was recorded. Null while he is inside, and for a stay that nobody ended (no time is invented). */
   leftAt: string | null;
   leaveReason: string | null;
   state: VisitState;
-  durationMin: number;
+  /** Minutes on site; null when the departure was never recorded. */
+  durationMin: number | null;
   arriveDistanceM: number;
-  lastSeenAt: string;
-  /** Only for a stay that is still open: where the agent's phone last reported. Past stays carry no position. */
-  position: {lat: number; lng: number; accuracyM: number} | null;
 };
 
 type VisitWithUser = VisitRow & {full_name: string; phone: string; login_identifier: string};
 
-/** Visits for the map and the log. A stay that went quiet for too long is shown as ended at its last report. */
+/** Stays for the attendance screen. A stay nobody ended for too long is shown as "not confirmed", not as a long shift. */
 export async function visitsFor(cafeteriaIds: string[], sinceIso: string, nowMs: number): Promise<VisitView[]> {
   if (!cafeteriaIds.length) return [];
   const rows = (
@@ -196,8 +183,7 @@ export async function visitsFor(cafeteriaIds: string[], sinceIso: string, nowMs:
   ).results;
   return rows.map((row) => {
     const state = visitState(row.last_seen_at, row.left_at, nowMs);
-    const endedAt = row.left_at ?? (state === 'lost' ? row.last_seen_at : null);
-    const open = state === 'live' || state === 'stale';
+    const departureKnown = !!row.left_at && row.leave_reason !== 'signal_lost';
     return {
       id: row.id,
       cafeteriaId: row.cafeteria_id,
@@ -205,13 +191,38 @@ export async function visitsFor(cafeteriaIds: string[], sinceIso: string, nowMs:
       name: row.full_name,
       phone: agentContactPhone(row),
       arrivedAt: row.arrived_at,
-      leftAt: endedAt,
-      leaveReason: row.left_at ? row.leave_reason : state === 'lost' ? 'signal_lost' : null,
+      leftAt: departureKnown ? row.left_at : null,
+      leaveReason: row.left_at ? row.leave_reason : state === 'unconfirmed' ? 'signal_lost' : null,
       state,
-      durationMin: durationMinutes(row.arrived_at, endedAt, nowMs),
+      durationMin: departureKnown ? durationMinutes(row.arrived_at, row.left_at, nowMs) : state === 'inside' ? durationMinutes(row.arrived_at, null, nowMs) : null,
       arriveDistanceM: row.arrive_distance_m,
-      lastSeenAt: row.last_seen_at,
-      position: open && row.last_lat !== null && row.last_lng !== null ? {lat: row.last_lat, lng: row.last_lng, accuracyM: row.last_accuracy_m} : null,
     };
   });
+}
+
+export type PresenceEvent = {id: string; kind: 'arrived' | 'left'; at: string; cafeteriaId: string; userId: string; name: string};
+
+/**
+ * What the administrator is told: one event per arrival and one per departure that the server heard of after
+ * `sinceIso`, oldest first. The feed follows when the server heard (arrival_logged_at / departure_logged_at), because a
+ * phone that was offline reports late with the time it saw the event; `at` is that event time. A stay that nobody
+ * ended (signal_lost) and a stay an administrator ended himself are not departures, so they are not announced.
+ */
+export async function eventsSince(cafeteriaIds: string[], sinceIso: string, limit = 60): Promise<PresenceEvent[]> {
+  if (!cafeteriaIds.length) return [];
+  const rows = (
+    await db()
+      .prepare(
+        `SELECT id,cafeteria_id,user_id,full_name,kind,at FROM (
+           SELECT v.id,v.cafeteria_id,v.user_id,u.full_name,'arrived' AS kind,v.arrived_at AS at,COALESCE(v.arrival_logged_at,v.arrived_at) AS heard FROM fushati_visits v JOIN fushati_users u ON u.id=v.user_id
+             WHERE v.cafeteria_id IN (SELECT value FROM json_each(?1)) AND COALESCE(v.arrival_logged_at,v.arrived_at)>?2
+           UNION ALL
+           SELECT v.id,v.cafeteria_id,v.user_id,u.full_name,'left' AS kind,v.left_at AS at,COALESCE(v.departure_logged_at,v.left_at) AS heard FROM fushati_visits v JOIN fushati_users u ON u.id=v.user_id
+             WHERE v.cafeteria_id IN (SELECT value FROM json_each(?1)) AND v.left_at IS NOT NULL AND COALESCE(v.departure_logged_at,v.left_at)>?2 AND COALESCE(v.leave_reason,'') NOT IN ('signal_lost','closed_by_admin')
+         ) ORDER BY heard ASC,kind ASC LIMIT ?3`,
+      )
+      .bind(JSON.stringify(cafeteriaIds), sinceIso, limit)
+      .all<{id: string; cafeteria_id: string; user_id: string; full_name: string; kind: 'arrived' | 'left'; at: string}>()
+  ).results;
+  return rows.map((row) => ({id: `${row.id}:${row.kind}`, kind: row.kind, at: row.at, cafeteriaId: row.cafeteria_id, userId: row.user_id, name: row.full_name}));
 }
