@@ -1,0 +1,107 @@
+name: Mobile apps
+
+# Builds the Android and iOS app shell in mobile/ so a broken plugin, permission or version number fails here and not on
+# someone's phone. Runs only when the shell changes (or by hand / on a release tag), never for website-only changes.
+on:
+  pull_request:
+    paths:
+      - 'mobile/**'
+      - 'app/native/**'
+      - 'lib/fushati/native-scan.ts'
+      - '.github/workflows/mobile.yml'
+  push:
+    tags: ['mobile-v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mobile-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: 'true'
+  # The website the app opens. Set it once in the repository: Settings > Secrets and variables > Actions > Variables.
+  # Without it a build still proves the shell compiles (against a placeholder address), but a release tag is refused.
+  KHOTWA_URL: ${{ vars.KHOTWA_APP_URL || 'https://example.com' }}
+  # The application id is permanent once an app is in a store. Empty means the default in mobile/capacitor.config.ts.
+  KHOTWA_APP_ID: ${{ vars.KHOTWA_APP_ID }}
+
+jobs:
+  android:
+    name: Android app
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write # only used to attach the app file to a release when a mobile-v* tag is pushed
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - name: Refuse a release without the real website address
+        if: startsWith(github.ref, 'refs/tags/mobile-v') && vars.KHOTWA_APP_URL == ''
+        run: |
+          echo "::error::Set the repository variable KHOTWA_APP_URL to the https address of the website before tagging a release."
+          exit 1
+      - name: The release tag must match the app version
+        if: startsWith(github.ref, 'refs/tags/mobile-v')
+        working-directory: mobile
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          if [ "mobile-v${version}" != "${GITHUB_REF_NAME}" ]; then
+            echo "::error::Tag ${GITHUB_REF_NAME} does not match mobile/package.json version ${version}. Change one so they agree."
+            exit 1
+          fi
+      - name: Install the shell's dependencies
+        working-directory: mobile
+        run: npm install --no-audit --no-fund
+      - name: Create the Android project and apply the permissions, texts and version
+        working-directory: mobile
+        run: npm run add:android
+      - name: Sync the plugins into the project
+        working-directory: mobile
+        run: npx cap sync android
+      - name: Build the app
+        working-directory: mobile/android
+        # Capacitor's Android project needs Java 21; the runner has it installed next to its default Java.
+        run: JAVA_HOME="$JAVA_HOME_21_X64" ./gradlew --no-daemon assembleDebug
+      - name: Check the built app has every permission and the background-location service
+        working-directory: mobile
+        run: node scripts/verify.mjs android
+      - name: Attach the app file to the release
+        if: startsWith(github.ref, 'refs/tags/mobile-v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp mobile/android/app/build/outputs/apk/debug/app-debug.apk "khotwa-${GITHUB_REF_NAME}.apk"
+          gh release create "$GITHUB_REF_NAME" "khotwa-${GITHUB_REF_NAME}.apk" --repo "$GITHUB_REPOSITORY" --title "Khotwa app ${GITHUB_REF_NAME#mobile-v}" --notes "Android app file for installing directly. Store builds need the signing key: see docs/MOBILE-APP.md."
+
+  ios:
+    name: iOS app (simulator build)
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - name: Install the shell's dependencies
+        working-directory: mobile
+        run: npm install --no-audit --no-fund
+      - name: Create the iOS project and apply the texts and version
+        working-directory: mobile
+        run: npm run add:ios
+      - name: Sync the plugins into the project
+        working-directory: mobile
+        run: npx cap sync ios
+      - name: Build for the simulator (unsigned, this only proves the project compiles)
+        working-directory: mobile/ios/App
+        run: >
+          xcodebuild -workspace App.xcworkspace -scheme App -configuration Debug
+          -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
