@@ -117,3 +117,5 @@
 .cfs-camera-row{display:flex;gap:10px;flex-wrap:wrap}
 .cfm-facts .cfm-code{grid-column:1/-1}
 .cfm-facts .cfm-code dd{overflow-wrap:normal;word-break:keep-all;text-align:start}
+
+.fs-suspended{color:#7a4800;background:#fdf0d8;border-radius:999px;padding:2px 10px;font-size:13px;font-weight:700;white-space:nowrap}

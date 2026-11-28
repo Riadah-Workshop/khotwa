@@ -29,6 +29,9 @@
 .am-item[data-tone="blue"]{color:#1c4a8c}
 .am-item[data-tone="blue"] svg{color:#1c4a8c}
 .am-item[data-tone="blue"]:hover:not(:disabled){background:#e5eefb}
+.am-item[data-tone="green"]{color:#0d5f47}
+.am-item[data-tone="green"] svg{color:#0d5f47}
+.am-item[data-tone="green"]:hover:not(:disabled){background:#e3f3ec}
 
 /* The question after a row that asks first ("Delete this?"), in the same place as the list. */
 .am-ask{display:grid;gap:10px;padding:8px 6px 6px}
