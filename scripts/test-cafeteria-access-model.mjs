@@ -96,6 +96,7 @@ try {
     ['edit-cafeteria', {id: cafe.a, name: 'Renamed'}],
     ['edit-cafeteria', {id: cafe.b, iban: 'SA0000000000000000000000'}], // the account parents pay into
     ['deactivate-cafeteria', {id: cafe.a}],
+    ['activate-cafeteria', {id: cafe.a}],
     ['delete-cafeteria', {id: cafe.a}],
     ['create-cafeteria', {schoolId: a.id, name: 'Another', bankName: '', iban: '', beneficiary: ''}],
   ]) await expectStatus(post(admin1, op, data), 403, `an administrator cannot ${op}`);
@@ -188,6 +189,16 @@ try {
   assert.deepEqual(removed.data.cafeterias, [], 'and he reaches nothing again');
   await expectStatus(post(systemAdmin, 'edit-cafeteria', {id: cafe.b, name: 'Renamed by the system administrator'}), 200, 'the system administrator renames a cafeteria');
   assert.equal((await first('SELECT name FROM fushati_cafeterias WHERE id=?', cafe.b)).name, 'Renamed by the system administrator');
+
+  // A suspended cafeteria can be resumed, and only by the system administrator.
+  await expectStatus(post(systemAdmin, 'deactivate-cafeteria', {id: cafe.b}), 200, 'the system administrator suspends a cafeteria');
+  assert.equal((await first('SELECT active FROM fushati_cafeterias WHERE id=?', cafe.b)).active, 0, 'it is suspended');
+  await expectStatus(post(admin2, 'activate-cafeteria', {id: cafe.b}), 403, 'a cafeteria administrator cannot resume a cafeteria');
+  assert.equal((await first('SELECT active FROM fushati_cafeterias WHERE id=?', cafe.b)).active, 0, 'still suspended');
+  await expectStatus(post(systemAdmin, 'activate-cafeteria', {id: cafe.b}), 200, 'the system administrator resumes it');
+  assert.equal((await first('SELECT active FROM fushati_cafeterias WHERE id=?', cafe.b)).active, 1, 'it is active again');
+  assert.equal((await first('SELECT name FROM fushati_cafeterias WHERE id=?', cafe.b)).name, 'Renamed by the system administrator', 'nothing else about it changed');
+  await expectStatus(post(systemAdmin, 'activate-cafeteria', {id: '00000000-0000-4000-8000-00000000dead'}), 404, 'an unknown cafeteria is reported, not created');
 
   console.log('Cafeteria access model passed: administrators limited to assigned cafeterias, alias only, grants per cafeteria, staff and receipts scoped, system administrator in charge.');
 } finally {
