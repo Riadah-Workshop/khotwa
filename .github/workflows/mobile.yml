@@ -100,7 +100,7 @@ jobs:
       - name: Sync the plugins into the project
         working-directory: mobile
         run: npx cap sync ios
-      - name: Build for the simulator (no signing: this only proves the project compiles)
+      - name: Build for the simulator (unsigned, this only proves the project compiles)
         working-directory: mobile/ios/App
         run: >
           xcodebuild -workspace App.xcworkspace -scheme App -configuration Debug

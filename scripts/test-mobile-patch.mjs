@@ -180,6 +180,11 @@ check('the website build, type check, lint and Docker image all leave the shell 
 });
 check('the build workflow pins every action to a commit like the main CI does', () => {
   const workflow = read('.github/workflows/mobile.yml');
+  // A colon followed by a space inside an unquoted step name is invalid YAML: GitHub then runs nothing and reports a bare failure.
+  for (const line of workflow.split('\n')) {
+    const name = /^\s*- name:\s*(.*)$/.exec(line)?.[1];
+    if (name && !/^['"]/.test(name)) assert.ok(!/:\s/.test(name), `unquoted step name contains ": ": ${name}`);
+  }
   const uses = [...workflow.matchAll(/uses:\s*(\S+)/g)].map((match) => match[1]);
   assert.ok(uses.length >= 2);
   for (const action of uses) assert.match(action, /@[0-9a-f]{40}$/, action);
