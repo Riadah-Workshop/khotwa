@@ -1,8 +1,11 @@
 'use client';
-import {useEffect, useRef, useState} from 'react';
+import {useEffect, useRef, useState, useSyncExternalStore} from 'react';
 import type {FormEvent} from 'react';
 import {Camera, ScanBarcode, Square} from 'lucide-react';
 import {barcodeMessage, barcodeProblem, normalizeBarcode} from '../../lib/fushati/barcode';
+import {nativeScanAvailable, scanWithPhone} from '../native/scan';
+
+const noSubscription = () => () => undefined;
 
 type Controls = {stop: () => void};
 
@@ -10,7 +13,8 @@ type Controls = {stop: () => void};
  * Takes a barcode from whichever way the person has: a scanner plugged in or paired by Bluetooth (it types the digits
  * and presses Enter, so a focused box is all it needs), the phone camera, or the keys. The camera stays on between
  * scans; while `paused` is true a code that is read is ignored, so the screen can show its result without being
- * overtaken by the next read.
+ * overtaken by the next read. Inside the Android / iOS app the camera button opens the phone's own scanner instead
+ * (fast, works in poor light, reads damaged codes); if that is missing the website's camera reader takes over.
  */
 export default function BarcodeCapture({language, onCode, paused, label}: {language: 'ar' | 'en'; onCode: (code: string) => void; paused: boolean; label?: string}) {
   const t = (ar: string, en: string) => (language === 'en' ? en : ar);
@@ -18,6 +22,11 @@ export default function BarcodeCapture({language, onCode, paused, label}: {langu
   const [problem, setProblem] = useState('');
   const [camera, setCamera] = useState<'off' | 'starting' | 'on'>('off');
   const [cameraError, setCameraError] = useState('');
+  // Whether the app's own scanner exists is only known in the browser, so the server render assumes it does not.
+  const phoneScanner = useSyncExternalStore(noSubscription, nativeScanAvailable, () => false);
+  const [phoneFailed, setPhoneFailed] = useState(false);
+  const [phoneBusy, setPhoneBusy] = useState(false);
+  const usePhone = phoneScanner && !phoneFailed;
   const video = useRef<HTMLVideoElement>(null);
   const box = useRef<HTMLInputElement>(null);
   const controls = useRef<Controls | null>(null);
@@ -85,6 +94,37 @@ export default function BarcodeCapture({language, onCode, paused, label}: {langu
     }
   }
 
+  async function scanOnPhone() {
+    if (phoneBusy || pausedRef.current) return;
+    setPhoneBusy(true);
+    setCameraError('');
+    setProblem('');
+    const outcome = await scanWithPhone();
+    setPhoneBusy(false);
+    if (outcome.kind === 'cancelled') return;
+    if (outcome.kind === 'denied') {
+      setCameraError(t('الكاميرا غير مسموحة. فعّلها للتطبيق من إعدادات الهاتف ثم أعد المحاولة.', 'The camera is not allowed. Turn it on for the app in the phone settings, then try again.'));
+      return;
+    }
+    if (outcome.kind === 'preparing') {
+      setCameraError(t('يجهّز الهاتف الماسح الضوئي. انتظر لحظات ثم اضغط من جديد.', 'The phone is getting the scanner ready. Wait a moment, then tap again.'));
+      return;
+    }
+    if (outcome.kind === 'unavailable' || outcome.kind === 'failed') {
+      setPhoneFailed(true);
+      setCameraError(t('تعذر فتح ماسح الهاتف. يمكنك استخدام الكاميرا العادية أو كتابة الرقم.', 'The phone scanner could not open. You can use the regular camera or type the number.'));
+      return;
+    }
+    const code = normalizeBarcode(outcome.code);
+    const found = barcodeProblem(code);
+    if (found) {
+      setProblem(barcodeMessage(found, language));
+      return;
+    }
+    recent.current = {code, time: Date.now()};
+    emit.current(code);
+  }
+
   function submit(event: FormEvent) {
     event.preventDefault();
     if (pausedRef.current) return;
@@ -110,11 +150,13 @@ export default function BarcodeCapture({language, onCode, paused, label}: {langu
       <button className="kx-btn is-solid" disabled={paused || !text.trim()}><ScanBarcode size={18} aria-hidden="true"/>{t('بحث', 'Look up')}</button>
     </form>
     <div className="cfs-camera-row">
-      {camera === 'off'
+      {usePhone
+        ? <button type="button" className="kx-btn is-solid" disabled={paused || phoneBusy} onClick={scanOnPhone}><Camera size={18} aria-hidden="true"/>{phoneBusy ? t('جارٍ فتح الماسح…', 'Opening the scanner…') : t('امسح بكاميرا الهاتف', 'Scan with the phone camera')}</button>
+        : camera === 'off'
         ? <button type="button" className="kx-btn" onClick={startCamera}><Camera size={18} aria-hidden="true"/>{t('مسح بالكاميرا', 'Scan with the camera')}</button>
         : <button type="button" className="kx-btn" onClick={stopCamera}><Square size={16} aria-hidden="true"/>{camera === 'starting' ? t('جارٍ تشغيل الكاميرا…', 'Starting the camera…') : t('إيقاف الكاميرا', 'Stop the camera')}</button>}
     </div>
-    <video ref={video} className="cfs-video" playsInline muted hidden={camera === 'off'} aria-label={t('معاينة الكاميرا', 'Camera preview')}/>
+    <video ref={video} className="cfs-video" playsInline muted hidden={usePhone || camera === 'off'} aria-label={t('معاينة الكاميرا', 'Camera preview')}/>
     {problem && <p role="alert" className="cfs-problem">{problem}</p>}
     {cameraError && <p role="alert" className="cfs-problem">{cameraError}</p>}
   </div>;

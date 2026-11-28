@@ -1,0 +1,5 @@
+node_modules/
+# Generated on every build (npm run add:android / add:ios); the shell has no hand-written native code to keep.
+android/
+ios/
+www/
