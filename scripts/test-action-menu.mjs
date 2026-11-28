@@ -89,6 +89,7 @@ const menu = {width: 220, height: 200};
     ['red row on the list', '#9b1c1c', '#ffffff'], ['red row on hover', '#9b1c1c', '#fde8e8'],
     ['amber row on the list', '#7a4800', '#ffffff'], ['amber row on hover', '#7a4800', '#fdf0d8'],
     ['blue row on the list', '#1c4a8c', '#ffffff'], ['blue row on hover', '#1c4a8c', '#e5eefb'],
+    ['green row on the list', '#0d5f47', '#ffffff'], ['green row on hover', '#0d5f47', '#e3f3ec'],
     ['dots on the button', '#35514a', '#ffffff'], ['dots on the open button', '#35514a', '#e1eee7'],
     ['Yes button', '#ffffff', '#c53030'], ['Yes button (amber)', '#ffffff', '#a95a05'], ['Yes button (blue)', '#ffffff', '#2563a8'], ['Yes button (green)', '#ffffff', '#13775a'], ['Yes button (slate)', '#ffffff', '#475569'],
     ['typed word chip', '#394655', '#edf0f3'], ['row icon', '#4f6159', '#ffffff'],
