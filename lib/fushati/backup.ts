@@ -8,7 +8,7 @@ import {db, now} from './core';
 // column that is in neither, so a new secret is never exported by accident, and a new field is never forgotten.
 export const BACKUP_TABLES: Record<string, {include: string[]; leftOut: string[]}> = {
   fushati_cafeterias: {include: ['id', 'school_id', 'name', 'alias', 'bank_name', 'iban', 'beneficiary', 'active', 'latitude', 'longitude', 'arrival_radius_m', 'created_at'], leftOut: []},
-  fushati_users: {include: ['id', 'email', 'login_identifier', 'full_name', 'phone', 'role', 'active', 'must_change_password', 'session_version', 'activated_at', 'created_at'], leftOut: ['password_hash']},
+  fushati_users: {include: ['id', 'email', 'login_identifier', 'full_name', 'phone', 'role', 'active', 'must_change_password', 'session_version', 'activated_at', 'created_at', 'presence_email'], leftOut: ['password_hash']},
   fushati_assignments: {include: ['user_id', 'cafeteria_id', 'permissions'], leftOut: []},
   fushati_menu_items: {include: ['id', 'cafeteria_id', 'name', 'category', 'price_minor', 'active', 'available', 'created_by', 'created_at', 'barcode'], leftOut: []},
   fushati_inventory: {include: ['menu_item_id', 'tracked', 'on_hand', 'low_stock_threshold', 'cost_minor', 'updated_at'], leftOut: []},
@@ -18,7 +18,7 @@ export const BACKUP_TABLES: Record<string, {include: string[]; leftOut: string[]
   fushati_purchases: {include: ['id', 'account_id', 'cafeteria_id', 'agent_id', 'items_json', 'total_minor', 'day_key', 'month_key', 'posted', 'created_at'], leftOut: []},
   fushati_ledger: {include: ['id', 'account_id', 'amount_minor', 'entry_type', 'reference_id', 'description', 'day_key', 'month_key', 'created_at'], leftOut: []},
   fushati_attendance_alerts: {include: ['id', 'cafeteria_id', 'school_id', 'student_id', 'parent_phone', 'agent_id', 'day_key', 'detail', 'created_at'], leftOut: []},
-  fushati_visits: {include: ['id', 'user_id', 'cafeteria_id', 'day_key', 'arrived_at', 'arrive_accuracy_m', 'arrive_distance_m', 'last_accuracy_m', 'last_seen_at', 'left_at', 'leave_reason'], leftOut: ['arrive_lat', 'arrive_lng', 'last_lat', 'last_lng']},
+  fushati_visits: {include: ['id', 'user_id', 'cafeteria_id', 'day_key', 'arrived_at', 'arrive_accuracy_m', 'arrive_distance_m', 'last_accuracy_m', 'last_seen_at', 'left_at', 'leave_reason', 'arrival_logged_at', 'departure_logged_at'], leftOut: ['arrive_lat', 'arrive_lng', 'last_lat', 'last_lng']},
   fushati_audit: {include: ['id', 'actor_id', 'operation', 'target_type', 'target_id', 'detail', 'created_at'], leftOut: []},
   // Single-use sign-in links: nothing to restore, and the hashes are secrets.
   fushati_invites: {include: [], leftOut: ['id', 'user_id', 'token_hash', 'expires_at', 'consumed_at', 'created_at']},

@@ -1,7 +1,9 @@
 'use client';
-// "Map and attendance" for cafeteria administrators and supervisors who may see it (presence_view):
-// their cafeterias on a map, the agents who are inside them right now (name, phone, last report), and the
-// log of when each agent came and left. The system administrator also sets each cafeteria's map point here.
+// "Attendance" for administrators only (never an agent): who is inside each cafeteria right now and the log of when
+// each agent arrived and left. The phone reports arrival and departure by itself; no position is ever stored or
+// shown. The cafeterias are on a map only so that the system administrator can set each one's point here (the
+// agent's phone compares its position with that point and radius). An administrator can ask for an e-mail on every
+// arrival and departure.
 import {useCallback, useEffect, useState} from 'react';
 import './presence.css';
 import OsmMap, {type MapMarker} from '../../components/osm-map';
@@ -10,9 +12,9 @@ import {isLatitude, isLongitude, MAX_ARRIVAL_RADIUS_M, MIN_ARRIVAL_RADIUS_M, rou
 type MapCafeteria = {id: string; name: string; alias: string; schoolName: string; active: boolean; latitude: number | null; longitude: number | null; radiusM: number; canManage: boolean};
 type MapVisit = {
   id: string; cafeteriaId: string; userId: string; name: string; phone: string; arrivedAt: string; leftAt: string | null; leaveReason: string | null;
-  state: 'live' | 'stale' | 'lost' | 'ended'; durationMin: number; arriveDistanceM: number; lastSeenAt: string; position: {lat: number; lng: number; accuracyM: number} | null;
+  state: 'inside' | 'unconfirmed' | 'ended'; durationMin: number | null; arriveDistanceM: number;
 };
-type MapData = {now: string; canSetLocation: boolean; cafeterias: MapCafeteria[]; visits: MapVisit[]};
+type MapData = {now: string; canSetLocation: boolean; canEmail: boolean; emailAlerts: boolean; cafeterias: MapCafeteria[]; visits: MapVisit[]};
 type Editing = {id: string; lat: string; lng: string; radius: string};
 
 const cafeLabel = (c: {name: string; alias: string}) => (c.alias ? `${c.alias} (${c.name})` : c.name);
@@ -64,34 +66,28 @@ export default function PresencePanel({language}: {language: 'ar' | 'en'}) {
   const time = useCallback((iso: string) => new Date(iso).toLocaleTimeString(locale, {timeZone: 'Asia/Riyadh', hour: '2-digit', minute: '2-digit'}), [locale]);
   const day = useCallback((iso: string) => new Date(iso).toLocaleDateString(locale, {timeZone: 'Asia/Riyadh', day: 'numeric', month: 'short'}), [locale]);
 
-  if (!data) return <section className="fs-card" aria-live="polite"><h2>{t('الخريطة والحضور', 'Map & attendance')}</h2><p className={error ? 'fs-error' : undefined}>{error || t('جار التحميل…', 'Loading…')}</p></section>;
+  if (!data) return <section className="fs-card" aria-live="polite"><h2>{t('الحضور والانصراف', 'Attendance')}</h2><p className={error ? 'fs-error' : undefined}>{error || t('جار التحميل…', 'Loading…')}</p></section>;
 
-  const nowMs = Date.parse(data.now);
-  const minutesAgo = (iso: string) => Math.max(0, Math.round((nowMs - Date.parse(iso)) / 60000));
   const cafes = data.cafeterias.filter((c) => filter === 'all' || c.id === filter);
   const cafeById = new Map<string, MapCafeteria>(data.cafeterias.map((c): [string, MapCafeteria] => [c.id, c]));
   const visits = data.visits.filter((v) => filter === 'all' || v.cafeteriaId === filter);
-  const present = visits.filter((v) => v.state === 'live' || v.state === 'stale');
+  const present = visits.filter((v) => v.state === 'inside');
   const reasonLabel = (v: MapVisit) => {
-    if (!v.leftAt) return t('موجود الآن', 'Present');
+    if (v.state === 'inside') return t('موجود الآن', 'Inside now');
     switch (v.leaveReason) {
-      case 'left_area': return t('غادر المنطقة', 'Left the area');
+      case 'left_area': return t('غادر المقصف', 'Left the cafeteria');
       case 'moved': return t('انتقل إلى مقصف آخر', 'Moved to another cafeteria');
-      case 'signal_lost': return t('انقطعت الإشارة', 'Signal lost');
+      case 'signal_lost': return t('لم تُسجَّل المغادرة', 'Departure not recorded');
       case 'closed_by_admin': return t('أنهاها المدير', 'Ended by administrator');
-      default: return t('سجّل المغادرة', 'Checked out');
+      default: return t('غادر', 'Left');
     }
   };
-  const duration = (minutes: number) => (minutes >= 60 ? `${Math.floor(minutes / 60)}${t(' س ', 'h ')}${minutes % 60}${t(' د', 'm')}` : `${minutes}${t(' د', 'm')}`);
+  const duration = (minutes: number | null) => (minutes === null ? '—' : minutes >= 60 ? `${Math.floor(minutes / 60)}${t(' س ', 'h ')}${minutes % 60}${t(' د', 'm')}` : `${minutes}${t(' د', 'm')}`);
 
   const markers: MapMarker[] = [];
   for (const c of cafes) {
     if (c.latitude === null || c.longitude === null) continue;
     markers.push({id: c.id, lat: c.latitude, lng: c.longitude, kind: 'cafeteria', label: `${cafeLabel(c)} — ${c.schoolName}`, radiusM: c.radiusM});
-  }
-  for (const v of present) {
-    if (!v.position) continue;
-    markers.push({id: v.id, lat: v.position.lat, lng: v.position.lng, kind: v.state === 'live' ? 'agent' : 'agent-stale', label: `${v.name}${v.phone ? ` · ${v.phone}` : ''}`});
   }
 
   const draft = editing && isLatitude(Number(editing.lat)) && isLongitude(Number(editing.lng)) && editing.lat.trim() !== '' && editing.lng.trim() !== '' ? {lat: Number(editing.lat), lng: Number(editing.lng)} : null;
@@ -119,6 +115,15 @@ export default function PresencePanel({language}: {language: 'ar' | 'en'}) {
     setReload((n) => n + 1);
   }
 
+  async function setEmailAlerts(enabled: boolean) {
+    setBusy(true);
+    setError('');
+    const result = await post('set-email-alerts', {enabled});
+    setBusy(false);
+    if (!result.ok) return setError(result.error || 'error');
+    setData((current) => (current ? {...current, emailAlerts: enabled} : current));
+  }
+
   async function endStay(visitId: string) {
     setBusy(true);
     const result = await post('force-checkout', {visitId});
@@ -139,7 +144,7 @@ export default function PresencePanel({language}: {language: 'ar' | 'en'}) {
   return (
     <section className="fs-card fs-presence">
       <div className="fs-presence-head">
-        <h2>{t('الخريطة والحضور', 'Map & attendance')}</h2>
+        <h2>{t('الحضور والانصراف', 'Attendance')}</h2>
         <label>{t('المقصف', 'Cafeteria')}{' '}
           <select value={filter} onChange={(e) => { setFilter(e.target.value); setSelected(null); }}>
             <option value="all">{t('كل مقاصفي', 'All my cafeterias')}</option>
@@ -149,6 +154,12 @@ export default function PresencePanel({language}: {language: 'ar' | 'en'}) {
       </div>
       {error && <p role="alert" className="fs-error">{error}</p>}
       {!data.cafeterias.length && <p>{t('لا توجد مقاصف متاحة لك.', 'No cafeterias are available to you.')}</p>}
+      {data.canEmail && (
+        <label className="fs-switch">
+          <input type="checkbox" checked={data.emailAlerts} disabled={busy} onChange={(e) => void setEmailAlerts(e.target.checked)} />
+          <span>{t('أرسل لي بريداً عند وصول أي موظف أو مغادرته', 'E-mail me when an employee arrives or leaves')}</span>
+        </label>
+      )}
 
       <div className="fs-presence-grid">
         <div>
@@ -160,20 +171,17 @@ export default function PresencePanel({language}: {language: 'ar' | 'en'}) {
             onPick={editing ? (point) => setEditing({...editing, lat: String(roundCoordinate(point.lat)), lng: String(roundCoordinate(point.lng))}) : undefined}
             height={430}
             fitKey={`${filter}|${editing?.id || ''}`}
-            labels={{map: t('خريطة المقاصف والموظفين', 'Map of cafeterias and staff'), zoomIn: t('تكبير', 'Zoom in'), zoomOut: t('تصغير', 'Zoom out'), fit: t('عرض الكل', 'Show everything'), attribution: '© OpenStreetMap'}}
+            labels={{map: t('خريطة المقاصف', 'Map of the cafeterias'), zoomIn: t('تكبير', 'Zoom in'), zoomOut: t('تصغير', 'Zoom out'), fit: t('عرض الكل', 'Show everything'), attribution: '© OpenStreetMap'}}
           />
           <p className="fs-legend">
-            <span className="fs-dot fs-dot-cafe" /> {t('مقصف', 'Cafeteria')}
-            <span className="fs-dot fs-dot-live" /> {t('موظف (مباشر)', 'Agent (live)')}
-            <span className="fs-dot fs-dot-stale" /> {t('موظف (لا إشارة حديثة)', 'Agent (no recent signal)')}
+            <span className="fs-dot fs-dot-cafe" /> {t('مقصف ونصف قطر الوصول', 'Cafeteria and its arrival radius')}
           </p>
           {(selectedVisit || selectedCafe) && (
             <div className="fs-selected" role="status">
               {selectedVisit && <>
                 <strong>{selectedVisit.name}</strong>
                 {selectedVisit.phone && <> · <a dir="ltr" href={`tel:${selectedVisit.phone}`}>{selectedVisit.phone}</a></>}
-                <br />{cafeLabel(cafeById.get(selectedVisit.cafeteriaId) || {name: '', alias: ''})} · {t('وصل', 'Arrived')} {time(selectedVisit.arrivedAt)} · {t('آخر إشارة منذ', 'Last signal')} {minutesAgo(selectedVisit.lastSeenAt)} {t('د', 'min ago')}
-                {selectedVisit.position && <> · {t('دقة الموقع', 'Accuracy')} ±{selectedVisit.position.accuracyM} {t('م', 'm')}</>}
+                <br />{cafeLabel(cafeById.get(selectedVisit.cafeteriaId) || {name: '', alias: ''})} · {t('وصل', 'Arrived')} {time(selectedVisit.arrivedAt)}
               </>}
               {selectedCafe && <>
                 <strong>{cafeLabel(selectedCafe)}</strong> · {selectedCafe.schoolName}
@@ -192,9 +200,9 @@ export default function PresencePanel({language}: {language: 'ar' | 'en'}) {
               return (
                 <li key={v.id} data-selected={v.id === selected ? 'true' : undefined}>
                   <button type="button" className="fs-agent-main" onClick={() => setSelected(v.id === selected ? null : v.id)}>
-                    <span className={`fs-dot ${v.state === 'live' ? 'fs-dot-live' : 'fs-dot-stale'}`} />
+                    <span className="fs-dot fs-dot-live" />
                     <strong>{v.name}</strong>
-                    <small>{cafe ? cafeLabel(cafe) : ''} · {t('منذ', 'since')} {time(v.arrivedAt)} · {v.state === 'live' ? t('مباشر', 'live') : `${t('لا إشارة منذ', 'no signal for')} ${minutesAgo(v.lastSeenAt)} ${t('د', 'min')}`}</small>
+                    <small>{cafe ? cafeLabel(cafe) : ''} · {t('منذ', 'since')} {time(v.arrivedAt)}</small>
                   </button>
                   <span className="fs-agent-actions">
                     {v.phone && <a className="fs-call" dir="ltr" href={`tel:${v.phone}`}>{v.phone}</a>}
@@ -272,7 +280,7 @@ export default function PresencePanel({language}: {language: 'ar' | 'en'}) {
           </tbody>
         </table>
       </div>
-      <p className="fs-muted">{t('يُسجَّل موقع الموظف فقط بين وصوله ومغادرته، ولا يظهر إلا لمن لديه صلاحية رؤية الحضور.', 'An agent’s position is recorded only between arrival and departure, and shown only to people allowed to see attendance.')}</p>
+      <p className="fs-muted">{t('يُسجَّل وقت وصول الموظف إلى المقصف ومغادرته فقط، من جواله وبشكل تلقائي. لا يُحفظ موقعه ولا يراه أحد. هذه الصفحة للمديرين فقط.', 'Only the time an employee arrives at and leaves the cafeteria is recorded, automatically from his phone. His location is not kept and nobody sees it. This page is for administrators only.')}</p>
     </section>
   );
 }

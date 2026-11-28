@@ -187,7 +187,8 @@ try {
   assert.equal((await run(agent1, 'agent-attendance', cafe.a)).status, 403, 'nor attendance');
   assert.deepEqual((await get(agent1, 'op=catalog')).json.reports.map((r) => r.id).sort(), ['margin', 'sales-by-agent', 'sales-by-category', 'sales-by-item', 'sales-daily', 'sales-hourly']);
   await grantAgent1(['pos', 'reports', 'balances_view', 'presence_view']);
-  assert.deepEqual((await get(agent1, 'op=catalog')).json.reports.map((r) => r.id).sort(), ['agent-attendance', 'balances', 'topups']);
+  assert.deepEqual((await get(agent1, 'op=catalog')).json.reports.map((r) => r.id).sort(), ['balances', 'topups'], 'attendance is for administrators: presence_view cannot be given to an agent, so the attendance report never reaches him');
+  assert.equal((await run(agent1, 'agent-attendance', cafe.a)).status, 403, 'not even by asking for it');
   await grantAgent1(['pos']);
 
   // agent2: stock reports in a, sales reports in b, a data permission in the default cafeteria without "reports"

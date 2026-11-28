@@ -131,17 +131,16 @@ try {
   const forgottenRecent = await state('forgotten-recent');
   assert.deepEqual([forgottenRecent.leave_reason, forgottenRecent.left_at === forgottenRecent.last_seen_at, forgottenRecent.last_lat], ['signal_lost', true, 24.7], 'a recently forgotten stay is closed but keeps its position for the 30 days');
   const mine = await rows('SELECT * FROM fushati_visits WHERE user_id=? AND left_at IS NULL', ids.agent1);
-  assert.equal(mine.length, 1, 'the agent who checked in has his open stay, with his position');
-  assert.notEqual(mine[0].last_lat, null);
+  assert.equal(mine.length, 1, 'the agent who arrived has his open stay');
+  assert.deepEqual([mine[0].arrive_lat, mine[0].arrive_lng, mine[0].last_lat, mine[0].last_lng], [null, null, null, null], 'and it holds no position: positions are no longer stored');
   assert.equal(mine[0].cafeteria_id, cafe.a);
   assert.equal((await rows('SELECT * FROM fushati_visits WHERE left_at IS NULL')).length, 1, 'no other stay is left open');
 
-  // The map shows no position for a finished stay, whatever is stored.
-  await assign(ids.agent2, cafe.a, ['pos', 'presence_view']);
-  const map = await read(await serve(sessions.fushatiAgent2, `/api/fushati/presence?op=map&days=31`));
+  // The attendance screen never carries a position, whatever old rows still hold.
+  const map = await read(await serve(sessions.admin.default, `/api/fushati/presence?op=map&days=31`));
   assert.equal(map.status, 200, map.text.slice(0, 200));
-  const finished = map.json.visits.filter((v) => v.leftAt);
-  assert.ok(finished.length >= 3 && finished.every((v) => v.position === null), 'finished stays carry no position on the map');
+  assert.ok(map.json.visits.length >= 3 && map.json.visits.some((v) => v.leftAt) && map.json.visits.every((v) => !('position' in v)), 'no stay carries a position on the screen');
+  assert.ok(!/(?:24\.7|46\.6)[,}\]]/.test(map.text), 'and no coordinate of an old stay leaks into it (the cafeteria\'s own point is not a stay)');
 
   // A second clean-up changes nothing: it is safe to run again and again.
   const before = JSON.stringify(await rows('SELECT * FROM fushati_visits ORDER BY id'));

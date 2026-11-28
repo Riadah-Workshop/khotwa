@@ -10,6 +10,7 @@ import {normalizeAgentIdentifier} from './fushati/identifiers.ts';
 import {getFushatiInvite,activateFushatiAdmin} from './fushati/invitations.ts';
 import {parentPhone} from './parent-view.ts';
 import {parentLinkedSchools} from './parent-identities.ts';
+import {recordLoginStamp} from './login-stamps.ts';
 import {verifyAgentEmailChange} from './account-profile.ts';
 import {activationAccount,activateDeputy,safeHtml} from './deputy-invites.ts';
 import type {SchoolRole} from './school-tenancy';
@@ -195,6 +196,8 @@ export async function handleKhotwaAuthentication(request:Request,env:AuthEnv):Pr
    }
    if(!claim){await recordFailure(env.DB,limitKey);return {response:loginPage(parentLogin?'/parent':fushatiAdminLogin?'/fushati/admin':fushatiAgentLogin?'/fushati/agent':adminLogin?'/admin':managerLogin?'/manager':'/',true,kind,loginEnglish)};}
    await clearFailures(env.DB,limitKey);
+   // A time stamp of the sign-in (no position, no address). It never blocks the sign-in.
+   if(env.DB)await recordLoginStamp(env.DB,claim,request.headers.get('user-agent'));
    return {response:redirect(parentLogin?'/parent':fushatiAdminLogin?'/fushati/admin':fushatiAgentLogin?'/fushati/agent':adminLogin?'/admin':managerLogin?'/manager':target,sessionCookie(await signToken(secret,claim)))};
   }catch{return {response:new Response('Login service unavailable',{status:503,headers:{'Cache-Control':'no-store'}})};}
  }

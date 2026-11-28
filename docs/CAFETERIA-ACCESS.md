@@ -33,7 +33,7 @@ is an agent with more than the defaults.
 | `balances_view` | student account balances and limits |
 | `transfers_review` | approve or reject parents' bank transfers, open receipts |
 | `reports` | export reports |
-| `presence_view` | see agents on the map (name, phone, live position) and the arrival and departure log |
+| `presence_view` | **administrators only, never given to an agent**: see when agents arrived at and left the cafeteria (the log, who is inside now, the alert bar, e-mail alerts) |
 
 A grant can never exceed the cafeterias the grantor administers. If an agent works
 in a cafeteria the administrator does not manage, the administrator can change only
@@ -69,20 +69,35 @@ Tests: `scripts/test-location.mjs` and `scripts/test-cafeteria-presence.mjs`.
 cafeteria door or school gate, or type the coordinates, plus an arrival radius, default 150 m). Until it is set
 the cafeteria shows as "no map location" and agents cannot check in.
 
-**Arrival.** The agent turns on *arrival detection* on his phone. The phone watches its own position; when it is
-inside the arrival circle of one of his cafeterias (allowing for the phone's stated uncertainty, at most 100 m;
-a position vaguer than 150 m is ignored) it records the arrival and he shows as available. The server checks the
-same rule again, so a phone cannot check in anywhere but at the cafeteria's point. *Check in now* does the same by hand.
+**Arrival.** There is nothing for the agent to turn on or press, and he sees nothing of this feature (no card, no
+button, no map, no log). His phone follows its own position and, when it is inside the arrival circle of one of his
+cafeterias (allowing for the phone's stated uncertainty, at most 100 m; a position vaguer than 150 m is ignored),
+reports one thing: "arrived". The server checks the same rule once, so a phone cannot report an arrival anywhere
+but at the cafeteria's point. The only notice to the agent is one line in the page footer, the operating system's
+own location permission, and the standing notification Android shows while the app follows the position.
 
-**Departure.** Two reports in a row clearly outside the circle (radius plus 50 m) record the departure; so does
-*Check out*. If a phone goes silent for 30 minutes the stay is treated as ended at its last report (a dead battery
-does not become a ten-hour shift). An administrator can also end a stay that was forgotten.
+**Departure.** Two reports in a row clearly outside the circle (radius plus 50 m) make the phone report "left".
+A phone that was offline reports late with the time it saw the event (accepted if not in the future and not older
+than 12 hours); the administrator's alert still comes when the server hears. A stay with no departure for 16
+hours is "not confirmed": it is closed at the last confirmation without inventing a departure time or a length,
+and it is not announced as a departure. An administrator can also end a stay that was forgotten.
 
-**Privacy.** Before arrival the position never leaves the phone. From arrival to departure the latest position is
-stored (one row in `fushati_visits`, overwritten every ~30 s), shown only to people with `presence_view` in that
-cafeteria, with the agent's name and phone number. Finished stays keep the times, the distance at arrival and the
-reason, but no position. A web page cannot track in the background: the page must stay open on the agent's phone.
-Location is browser-reported and can be faked by a determined person; treat the log as attendance, not proof.
+**Who is told.** Only administrators (the cafeteria's administrator, and the system administrator). An alert bar at the
+top of every page of their dashboard says "Sara arrived at Main 07:12" / "left" within about 30 seconds while the
+page is open. A cafeteria administrator can switch on an e-mail for every arrival and departure in his cafeterias
+(*Attendance* tab; off by default; uses the same mail settings as invitations; a mail that cannot be sent never
+affects the agent). Push notifications to the phone are not built yet (they need a Firebase project and an Apple key).
+
+**Privacy.** The agent's position is looked at once, on arrival, and is never stored: `fushati_visits` keeps the times,
+the distance at arrival, the accuracy and the reason, and its coordinate columns stay empty (rows from before
+migration `0033` lose their coordinates after 30 days). Nobody can see where an agent is, now or later.
+In a browser the position arrives only while the page is open, so the record is best effort; the Android / iOS app
+follows it in the background. Location is device-reported and can be faked by a determined person; treat the log as
+attendance, not proof.
+
+**Sign-in stamps** are separate and for everybody: each successful sign-in (every role) writes the time, who, the
+school and whether it came from the website or the app, into `khotwa_login_stamps` (migration `0033`). No position,
+no IP address, no device identifier, for anyone. Stamps older than 180 days are removed as new ones arrive.
 
 **Map tiles** come from OpenStreetMap (`tile.openstreetmap.org`, the only third-party host the app loads from); the
 tile server sees the viewer's IP address and which area was viewed, as with any map. For heavy use, move to a tile
