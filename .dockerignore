@@ -13,6 +13,9 @@ coverage
 .wrangler
 data
 
+# The Android / iOS app shell is built by its own workflow, never by the website image
+mobile
+
 # Secrets and local configuration
 .env
 .env.*

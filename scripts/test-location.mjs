@@ -3,8 +3,8 @@
 // Run: node --experimental-strip-types scripts/test-location.mjs
 import assert from 'node:assert/strict';
 import {
-  DEFAULT_CENTER, DEPARTURE_MARGIN_M, LIVE_WINDOW_MS, MAX_USABLE_ACCURACY_M, OUTSIDE_FIXES_TO_LEAVE, SIGNAL_LOST_MS,
-  allowance, decideFix, distanceMeters, durationMinutes, fitBounds, hasLeftSpot, isAtSpot, isLatLng, isLatitude, isLongitude,
+  CLOCK_SKEW_MS, DEFAULT_CENTER, DEPARTURE_MARGIN_M, LATE_REPORT_MAX_MS, MAX_USABLE_ACCURACY_M, OUTSIDE_FIXES_TO_LEAVE, STAY_MAX_MS,
+  allowance, decideFix, distanceMeters, durationMinutes, eventTime, fitBounds, hasLeftSpot, isAtSpot, isLatLng, isLatitude, isLongitude,
   metersPerPixel, nearestSpot, project, roundCoordinate, unproject, visitState,
 } from '../lib/fushati/location.ts';
 import {agentContactPhone, normalizeAgentIdentifier, normalizeContactPhone} from '../lib/fushati/identifiers.ts';
@@ -78,13 +78,19 @@ ok(!hasLeftSpot(260, 150, 80), 'an unsure phone is not declared gone');
 {
   const at = Date.parse('2026-11-26T08:00:00.000Z');
   const seen = (ms) => new Date(at - ms).toISOString();
-  eq(visitState(seen(0), null, at), 'live', 'just reported');
-  eq(visitState(seen(LIVE_WINDOW_MS), null, at), 'live', 'at the edge of the live window');
-  eq(visitState(seen(LIVE_WINDOW_MS + 1000), null, at), 'stale', 'quiet for a few minutes');
-  eq(visitState(seen(SIGNAL_LOST_MS), null, at), 'stale', 'at the edge of signal lost');
-  eq(visitState(seen(SIGNAL_LOST_MS + 1000), null, at), 'lost', 'quiet for too long');
-  eq(visitState(seen(0), '2026-11-26T08:00:00.000Z', at), 'ended', 'checked out');
-  eq(visitState('not a date', null, at), 'lost', 'a corrupt timestamp is never "live"');
+  eq(visitState(seen(0), null, at), 'inside', 'just confirmed');
+  eq(visitState(seen(STAY_MAX_MS), null, at), 'inside', 'at the edge of the longest stay');
+  eq(visitState(seen(STAY_MAX_MS + 1000), null, at), 'unconfirmed', 'no departure for too long: nobody knows if he is still there');
+  eq(visitState(seen(0), '2026-11-26T08:00:00.000Z', at), 'ended', 'the departure was recorded');
+  eq(visitState('not a date', null, at), 'unconfirmed', 'a corrupt timestamp is never "inside"');
+  // A phone that was offline reports late, with the time the system saw the event.
+  const iso = (ms) => new Date(ms).toISOString();
+  eq(eventTime(undefined, at), at, 'no reported time: the time it was received');
+  eq(eventTime('garbage', at), at, 'an unreadable time is ignored');
+  eq(eventTime(iso(at - 20 * 60_000), at), at - 20 * 60_000, 'twenty minutes late is believed');
+  eq(eventTime(iso(at - LATE_REPORT_MAX_MS - 1000), at), at, 'older than the limit: the time it was received');
+  eq(eventTime(iso(at + 60_000), at), at, 'a minute in the future (clock difference) is clamped to now');
+  eq(eventTime(iso(at + CLOCK_SKEW_MS + 1000), at), at, 'further in the future is not believed');
   eq(durationMinutes('2026-11-26T05:00:00.000Z', '2026-11-26T06:30:00.000Z', at), 90, 'duration of a finished stay');
   eq(durationMinutes('2026-11-26T07:30:00.000Z', null, at), 30, 'an open stay counts up to now');
   eq(durationMinutes('2026-11-26T09:00:00.000Z', null, at), 0, 'never negative');
@@ -107,21 +113,21 @@ ok(!hasLeftSpot(260, 150, 80), 'an unsure phone is not declared gone');
   const near = decideFix(null, 0, fix(north(riyadh, 10)), [{id: 'far', ...north(riyadh, 120), radiusM: 150}, {id: 'near', ...riyadh, radiusM: 150}]);
   ok(near.action.type === 'check-in' && near.action.cafeteriaId === 'near', 'overlapping circles: the nearest cafeteria');
 
-  eq(act('A', 0, fix(north(riyadh, 40))).action.type, 'ping', 'checked in and inside: keep reporting');
+  eq(act('A', 0, fix(north(riyadh, 40))).action.type, 'stay', 'checked in and inside: nothing to send');
   const first = act('A', 0, fix(north(riyadh, 400)));
-  ok(first.action.type === 'ping' && first.outsideCount === 1, 'first report clearly outside: keep reporting, count it');
+  ok(first.action.type === 'stay' && first.outsideCount === 1, 'first report clearly outside: count it, send nothing');
   ok(OUTSIDE_FIXES_TO_LEAVE === 2, 'two reports in a row are needed to leave');
   const second = act('A', first.outsideCount, fix(north(riyadh, 405)));
   eq(second.action.type, 'check-out', 'second report outside in a row: record the departure');
   eq(second.outsideCount, 0, 'the count restarts after departure');
   const back = act('A', 1, fix(north(riyadh, 80)));
-  ok(back.action.type === 'ping' && back.outsideCount === 0, 'back inside before the second report: the count is cleared (a brief GPS jump is not a departure)');
+  ok(back.action.type === 'stay' && back.outsideCount === 0, 'back inside before the second report: the count is cleared (a brief GPS jump is not a departure)');
   const vague = act('A', 1, fix(north(riyadh, 900), MAX_USABLE_ACCURACY_M + 50));
-  ok(vague.action.type === 'ping' && vague.outsideCount === 1, 'a vague position is reported but does not count towards leaving');
+  ok(vague.action.type === 'stay' && vague.outsideCount === 1, 'a vague position does not count towards leaving');
   const edge = act('A', 1, fix(north(riyadh, 190)));
-  ok(edge.action.type === 'ping' && edge.outsideCount === 0, 'between the radius and the margin: still there');
-  eq(act('GONE', 0, fix(riyadh)).action.type, 'ping', 'a stay at a cafeteria the phone does not know is just reported');
-  eq(decideFix('A', 0, fix(riyadh), []).action.type, 'ping', 'no known cafeterias while checked in: report');
+  ok(edge.action.type === 'stay' && edge.outsideCount === 0, 'between the radius and the margin: still there');
+  eq(act('GONE', 0, fix(riyadh)).action.type, 'stay', 'a stay at a cafeteria the phone does not know: nothing to send');
+  eq(decideFix('A', 0, fix(riyadh), []).action.type, 'stay', 'no known cafeterias while inside: nothing to send');
 
   const nearestOne = nearestSpot(north(riyadh, 30), spots);
   ok(nearestOne && nearestOne.spot.id === 'A' && Math.round(nearestOne.distanceM) === 30, 'nearest cafeteria and its distance');

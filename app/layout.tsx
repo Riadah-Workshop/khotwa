@@ -24,8 +24,11 @@ import './iphone-compatibility.css';
 import './ui/sheet.css';
 import './ui/action-menu.css';
 import './ui/agent-shell.css';
+import './native/native.css';
+import AppHealth from './native/health';
+import UpdateBar from './native/update-bar';
 import {REGISTRATION_PRINT} from '../lib/registration';
 export const metadata:Metadata={title:'خطوة | نظام إدارة أعمال الوكيل المدرسي',description:'خطوة — نظام إدارة أعمال الوكيل المدرسي: تنظيم المهام، متابعة الطلاب، التواصل والتقارير — '+PROGRAM_OWNER_CREDIT,authors:[{name:PROGRAM_OWNER}],manifest:'/manifest.webmanifest',applicationName:'خطوة',appleWebApp:{capable:true,title:'خطوة',statusBarStyle:'default'},icons:{icon:[{url:'/app-icon-192.png',sizes:'192x192',type:'image/png'}],apple:[{url:'/app-icon-180.png',sizes:'180x180',type:'image/png'}]}};
 export const viewport:Viewport={width:'device-width',initialScale:1,themeColor:'#174f42'};
-export default function Layout({children}:{children:React.ReactNode}){return <html lang="ar" dir="rtl"><body>{children}<div className="print-owner-footer">{PROGRAM_OWNER_CREDIT} • خطوة<small className="ip-print-credit">{REGISTRATION_PRINT}</small></div></body></html>}
+export default function Layout({children}:{children:React.ReactNode}){return <html lang="ar" dir="rtl"><body><UpdateBar/>{children}<AppHealth/><div className="print-owner-footer">{PROGRAM_OWNER_CREDIT} • خطوة<small className="ip-print-credit">{REGISTRATION_PRINT}</small></div></body></html>}
 

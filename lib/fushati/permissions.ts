@@ -18,7 +18,7 @@ export const FUSHATI_PERMISSIONS = [
   'balances_view', // student account balances and limits
   'transfers_review', // approve or reject parents' bank transfers
   'reports', // export reports
-  'presence_view', // see agents on the map (name, phone, live position) and the arrival and departure log
+  'presence_view', // administrators only: see when agents arrived at and left the cafeteria (never granted to an agent)
 ] as const;
 
 export type FushatiPermission = (typeof FUSHATI_PERMISSIONS)[number];
@@ -28,10 +28,16 @@ export const AGENT_DEFAULT_PERMISSIONS: readonly FushatiPermission[] = ['pos', '
 
 const KNOWN = new Set<string>(FUSHATI_PERMISSIONS);
 
-/** Keeps only known permission names, once each, in the canonical order. */
+/**
+ * What an agent can never be given, whoever asks: arrivals and departures are recorded about the agents and shown to
+ * administrators only. The permission still exists (administrators have it) but is dropped from every agent's list.
+ */
+export const ADMIN_ONLY_PERMISSIONS: readonly FushatiPermission[] = ['presence_view'];
+
+/** Keeps only known permission names an agent may hold, once each, in the canonical order. */
 export function cleanPermissions(input: unknown): FushatiPermission[] {
   const wanted = new Set(Array.isArray(input) ? input.filter((value): value is string => typeof value === 'string') : []);
-  return FUSHATI_PERMISSIONS.filter((permission) => wanted.has(permission));
+  return FUSHATI_PERMISSIONS.filter((permission) => wanted.has(permission) && !ADMIN_ONLY_PERMISSIONS.includes(permission));
 }
 
 /** Reads the stored JSON array; anything unreadable grants nothing. */

@@ -48,6 +48,7 @@ for (const route of ['backup', 'compatibility', 'data', 'evidence-file', 'identi
 for (const route of ['visitors', 'messages', 'desk-close']) POLICY[`/api/${route}`] = ['admin', 'deputyDefault'];
 POLICY['/api/admin'] = ['admin', 'adminInSchool'];
 POLICY['/api/admin/records'] = ['admin', 'adminInSchool'];
+POLICY['/api/admin/diagnostics'] = ['admin', 'adminInSchool'];
 POLICY['/api/trip-cleanup'] = ['admin', 'adminInSchool'];
 POLICY['/api/account/profile'] = ['deputy', 'deputyDefault'];
 POLICY['/api/manager/overview'] = ['admin', 'adminInSchool', 'manager']; // managers: GET only (checked below)
@@ -59,7 +60,16 @@ POLICY['/api/fushati/presence'] = ['admin', 'adminInSchool', 'parent', 'fushatiA
 POLICY['/api/fushati/inventory'] = ['admin', 'adminInSchool', 'parent', 'fushatiAdmin', 'fushatiAgent']; // parents pass the gateway and are refused by the route (checked in test-cafeteria-inventory.mjs)
 POLICY['/api/fushati/reports'] = ['admin', 'adminInSchool', 'parent', 'fushatiAdmin', 'fushatiAgent']; // parents pass the gateway and are refused by the route (checked in test-cafeteria-reports.mjs)
 POLICY['/api/fushati/backup'] = ['admin', 'adminInSchool', 'parent', 'fushatiAdmin', 'fushatiAgent']; // only the system administrator is served; the route refuses everyone else (checked in test-cafeteria-reports.mjs)
+POLICY['/api/app/version'] = EVERYONE; // public GET: the app asks which version is current before anybody signs in (nothing private in the answer)
+POLICY['/api/app/report'] = STAFF; // GET follows the usual rules; the POST that matters is below
 POLICY['/api/webhooks/resend'] = EVERYONE; // public: the gateway skips the session check, the route verifies the sender's signature
+// Routes whose POST differs from their GET.
+//   /api/app/report   every signed-in role, the read-only manager included, may send a problem report (never anonymous)
+//   /api/app/version  only GET is public; a POST is an ordinary request, so the usual role rules apply
+const WRITE_POLICY = {
+  '/api/app/report': EVERYONE.filter((actor) => actor !== 'anonymous'),
+  '/api/app/version': STAFF,
+};
 const PUBLIC_ROUTES = new Set(['/api/webhooks/resend']); // no session, so no role rule (not even the manager's read-only rule) applies
 // -----------------------------------------------------------------------------------------------------
 
@@ -93,7 +103,7 @@ try {
       const allowedRoles = POLICY[route];
       await expect(actor, route, 'GET', allowedRoles.includes(actor));
       // Writes: same as reads, except the read-only school manager can never write (public routes have no session rules at all).
-      await expect(actor, route, 'POST', allowedRoles.includes(actor) && (actor !== 'manager' || PUBLIC_ROUTES.has(route)));
+      await expect(actor, route, 'POST', WRITE_POLICY[route] ? WRITE_POLICY[route].includes(actor) : allowedRoles.includes(actor) && (actor !== 'manager' || PUBLIC_ROUTES.has(route)));
     }
   }
   for (const [page, allowedRoles] of Object.entries(PAGES)) {

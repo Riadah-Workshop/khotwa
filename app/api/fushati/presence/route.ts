@@ -4,22 +4,28 @@ import {getKhotwaAccess, getChatGPTUser} from '../../../chatgpt-auth';
 import {trustedBrowserOrigin} from '../../../../lib/request-origin';
 import {audit, cafeteriaGrants, db, mustChange, now, response} from '../../../../lib/fushati/core';
 import {grantAdministers, grantAllows} from '../../../../lib/fushati/permissions';
-import {checkIn, checkOut, closeByAdmin, closeIfLost, openVisit, recordPing, visitsFor, type CafeteriaPoint} from '../../../../lib/fushati/presence';
+import {arrive, closeByAdmin, closeIfUnconfirmed, depart, eventsSince, openVisit, visitsFor, type CafeteriaPoint} from '../../../../lib/fushati/presence';
+import {mailPresenceEvent} from '../../../../lib/fushati/presence-mail';
 import {MAX_ARRIVAL_RADIUS_M, MIN_ARRIVAL_RADIUS_M, roundCoordinate} from '../../../../lib/fushati/location';
 
-// Where the cafeterias are, where the agents are (only while they are checked in), and when they came and left.
+// Where the cafeterias are, and when each agent arrived and left.
 //
-//   GET  ?op=map        administrators and supervisors with "presence_view": their cafeterias, who is there, the recent log
-//   GET  ?op=status     an agent: his cafeterias' map points and whether he is checked in
-//   POST check-in / ping / check-out     an agent's phone
+//   GET  ?op=status     an agent's phone: the map points of his cafeterias and whether he is inside one. Nothing else:
+//                       an agent never sees attendance, his own or anybody's.
+//   GET  ?op=map        administrators: their cafeterias, who is inside now and the arrival/departure log
+//   GET  ?op=feed       administrators: arrivals and departures since a given time (the alert bar polls this)
+//   POST check-in / check-out            an agent's phone, by itself, when it notices he reached or left the cafeteria
 //   POST set-location                    the system administrator: the cafeteria's map point and arrival radius
-//   POST force-checkout                  an administrator ends a stay the agent forgot to end
+//   POST force-checkout                  an administrator ends a stay nobody ended
+//   POST set-email-alerts                a cafeteria administrator: e-mail me on every arrival and departure
 //
+// The agent's position is looked at once, on arrival, to refuse a claim from somewhere else, and is never stored.
 // The school is never taken from the request. Every cafeteria used here comes from the signed-in user's own grants.
 export const dynamic = 'force-dynamic';
 
 const id = z.string().uuid();
 const position = z.object({lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180), accuracyM: z.number().min(0).max(100000).transform((value) => Math.min(value, 5000))});
+const reportedAt = z.string().max(40).optional();
 const bodyModel = z.object({op: z.string().min(1).max(45), data: z.unknown()});
 
 const fail = (code: string, message: string, status: number, extra: Record<string, unknown> = {}) => response({error: message, code, ...extra}, status);
@@ -49,29 +55,46 @@ export async function GET(req: Request) {
       const cafeterias = ids.length
         ? (await db().prepare('SELECT c.id,c.name,c.alias,c.latitude,c.longitude,c.arrival_radius_m FROM fushati_cafeterias c WHERE c.active=1 AND c.id IN (SELECT value FROM json_each(?)) ORDER BY c.name').bind(JSON.stringify(ids)).all<{id: string; name: string; alias: string; latitude: number | null; longitude: number | null; arrival_radius_m: number}>()).results
         : [];
-      const visit = await closeIfLost(await openVisit(access.userId), nowMs);
-      const recent = (await db().prepare('SELECT v.id,v.cafeteria_id,v.arrived_at,v.left_at,v.leave_reason FROM fushati_visits v WHERE v.user_id=? ORDER BY v.arrived_at DESC LIMIT 10').bind(access.userId).all<{id: string; cafeteria_id: string; arrived_at: string; left_at: string | null; leave_reason: string | null}>()).results;
+      const visit = await closeIfUnconfirmed(await openVisit(access.userId), nowMs);
       return response({
         now: stamp,
-        cafeterias: cafeterias.map((c) => ({id: c.id, name: c.name, alias: c.alias, latitude: c.latitude, longitude: c.longitude, radiusM: c.arrival_radius_m})),
-        visit: visit ? {id: visit.id, cafeteriaId: visit.cafeteria_id, arrivedAt: visit.arrived_at, lastSeenAt: visit.last_seen_at} : null,
-        recent: recent.map((r) => ({id: r.id, cafeteriaId: r.cafeteria_id, arrivedAt: r.arrived_at, leftAt: r.left_at, leaveReason: r.leave_reason})),
+        cafeterias: cafeterias.map((c) => ({id: c.id, latitude: c.latitude, longitude: c.longitude, radiusM: c.arrival_radius_m})),
+        insideCafeteriaId: visit ? visit.cafeteria_id : null,
       });
     }
 
+    // Everything below is for administrators. An agent gets nothing, whatever he was once granted.
+    if (access.role === 'fushati_agent') return fail('forbidden', 'للمديرين فقط', 403);
+    const visible = [...grants].filter(([, grant]) => grantAllows(grant, 'presence_view')).map(([cafeteriaId]) => cafeteriaId);
+
     if (op === 'map') {
-      const visible = [...grants].filter(([, grant]) => grantAllows(grant, 'presence_view')).map(([cafeteriaId]) => cafeteriaId);
       const days = Math.min(31, Math.max(1, Number(search.get('days')) || 7));
       const rows = visible.length
-        ? (await db().prepare('SELECT c.id,c.name,c.alias,c.active,c.latitude,c.longitude,c.arrival_radius_m,s.name AS school_name FROM fushati_cafeterias c JOIN khotwa_schools s ON s.id=c.school_id WHERE s.active=1 AND c.id IN (SELECT value FROM json_each(?))' + (access.role === 'fushati_agent' ? ' AND c.active=1' : '') + ' ORDER BY s.name,c.name').bind(JSON.stringify(visible)).all<Cafeteria>()).results
+        ? (await db().prepare('SELECT c.id,c.name,c.alias,c.active,c.latitude,c.longitude,c.arrival_radius_m,s.name AS school_name FROM fushati_cafeterias c JOIN khotwa_schools s ON s.id=c.school_id WHERE s.active=1 AND c.id IN (SELECT value FROM json_each(?)) ORDER BY s.name,c.name').bind(JSON.stringify(visible)).all<Cafeteria>()).results
         : [];
       const visits = await visitsFor(rows.map((c) => c.id), new Date(nowMs - days * DAY_MS).toISOString(), nowMs);
+      const mine = access.role === 'fushati_admin' ? await db().prepare('SELECT presence_email FROM fushati_users WHERE id=?').bind(access.userId).first<{presence_email: number}>() : null;
       return response({
         now: stamp,
         canSetLocation: access.role === 'main_admin',
+        canEmail: access.role === 'fushati_admin',
+        emailAlerts: mine?.presence_email === 1,
         cafeterias: rows.map((c) => ({id: c.id, name: c.name, alias: c.alias, schoolName: c.school_name, active: c.active === 1, latitude: c.latitude, longitude: c.longitude, radiusM: c.arrival_radius_m, canManage: grantAdministers(grants.get(c.id))})),
         visits,
       });
+    }
+
+    if (op === 'feed') {
+      // No cursor yet: nothing to announce, just the time to start from. The alert bar never replays history.
+      const since = search.get('since');
+      const cursor = since && Number.isFinite(Date.parse(since)) ? new Date(Math.max(Date.parse(since), nowMs - DAY_MS)).toISOString() : null;
+      const events = cursor ? await eventsSince(visible, cursor) : [];
+      const names = new Map<string, string>();
+      if (events.length) {
+        const rows = (await db().prepare('SELECT id,name,alias FROM fushati_cafeterias WHERE id IN (SELECT value FROM json_each(?))').bind(JSON.stringify([...new Set(events.map((event) => event.cafeteriaId))])).all<{id: string; name: string; alias: string}>()).results;
+        for (const row of rows) names.set(row.id, row.alias ? `${row.alias} (${row.name})` : row.name);
+      }
+      return response({now: stamp, events: events.map((event) => ({...event, cafeteria: names.get(event.cafeteriaId) ?? ''}))});
     }
     return fail('unknown', 'عملية غير متاحة', 400);
   } catch (error) {
@@ -90,29 +113,33 @@ export async function POST(req: Request) {
     const {op, data} = bodyModel.parse(JSON.parse(raw));
     if (await mustChange(access)) return fail('password', 'غيّر كلمة المرور المؤقتة أولاً', 403);
 
-    // ---- the agent's phone ---------------------------------------------------------------------------------
-    if (op === 'check-in' || op === 'ping' || op === 'check-out') {
-      if (access.role !== 'fushati_agent') return fail('forbidden', 'تسجيل الحضور لموظفي المقصف فقط', 403);
+    // ---- the agent's phone, by itself ----------------------------------------------------------------------
+    if (op === 'check-in' || op === 'check-out') {
+      if (access.role !== 'fushati_agent') return fail('forbidden', 'الحضور التلقائي لموظفي المقصف فقط', 403);
       if (op === 'check-in') {
-        const v = z.object({cafeteriaId: id}).extend(position.shape).parse(data);
+        const v = z.object({cafeteriaId: id, at: reportedAt}).extend(position.shape).parse(data);
         // Any assignment is enough: arriving at the counter does not depend on what the agent may do there.
         if (!(await cafeteriaGrants(access)).has(v.cafeteriaId)) return fail('cafeteria', 'المقصف غير متاح', 403);
         const cafeteria = await db().prepare('SELECT id,latitude,longitude,arrival_radius_m,active FROM fushati_cafeterias WHERE id=?').bind(v.cafeteriaId).first<CafeteriaPoint & {active: number}>();
         if (!cafeteria || !cafeteria.active) return fail('cafeteria', 'المقصف غير متاح', 403);
-        const result = await checkIn(access.userId, cafeteria, {lat: v.lat, lng: v.lng, accuracyM: v.accuracyM});
+        const result = await arrive(access.userId, cafeteria, {lat: v.lat, lng: v.lng, accuracyM: v.accuracyM}, v.at);
         if (!result.ok && result.code === 'no_location') return fail('no_location', 'لم يحدد مدير النظام موقع هذا المقصف بعد', 409);
         if (!result.ok) return fail('too_far', 'لم تصل إلى المقصف بعد', 422, {distanceM: result.distanceM, radiusM: result.radiusM});
-        return response({ok: true, visitId: result.visitId, arrivedAt: result.arrivedAt, already: result.already});
+        if (!result.already) {
+          const agent = await db().prepare('SELECT full_name FROM fushati_users WHERE id=?').bind(access.userId).first<{full_name: string}>();
+          if (result.movedFrom) await mailPresenceEvent('left', result.movedFrom, agent?.full_name ?? '', now());
+          await mailPresenceEvent('arrived', cafeteria.id, agent?.full_name ?? '', result.arrivedAt);
+        }
+        return response({ok: true, already: result.already});
       }
-      if (op === 'ping') {
-        const v = position.parse(data);
-        const result = await recordPing(access.userId, v);
-        return result.checkedIn ? response({ok: true, checkedIn: true}) : fail('not_checked_in', 'لست مسجلاً في أي مقصف', 409);
-      }
-      const v = position.partial().parse(data ?? {});
+      const v = position.partial().extend({at: reportedAt}).parse(data ?? {});
       const where = v.lat !== undefined && v.lng !== undefined && v.accuracyM !== undefined ? {lat: v.lat, lng: v.lng, accuracyM: v.accuracyM} : null;
-      const result = await checkOut(access.userId, where);
-      return response({ok: true, checkedIn: false, ...result});
+      const result = await depart(access.userId, where, v.at);
+      if (result.checkedOut) {
+        const agent = await db().prepare('SELECT full_name FROM fushati_users WHERE id=?').bind(access.userId).first<{full_name: string}>();
+        await mailPresenceEvent('left', result.cafeteriaId, agent?.full_name ?? '', result.leftAt);
+      }
+      return response({ok: true, checkedOut: result.checkedOut});
     }
 
     // ---- administrators ------------------------------------------------------------------------------------
@@ -137,6 +164,12 @@ export async function POST(req: Request) {
       if (closed) await audit(access.userId, op, 'visit', visit.id);
       return response({ok: true, closed});
     }
+    if (op === 'set-email-alerts') {
+      if (access.role !== 'fushati_admin') return fail('forbidden', 'لمدير المقصف فقط', 403);
+      const v = z.object({enabled: z.boolean()}).parse(data);
+      await db().prepare('UPDATE fushati_users SET presence_email=? WHERE id=? AND role=\'fushati_admin\'').bind(v.enabled ? 1 : 0, access.userId).run();
+      return response({ok: true, emailAlerts: v.enabled});
+    }
     return fail('unknown', 'عملية غير متاحة', 400);
   } catch (error) {
     return failure(error);
@@ -146,5 +179,5 @@ export async function POST(req: Request) {
 function failure(error: unknown) {
   if (error instanceof ZodError || error instanceof SyntaxError) return fail('invalid', 'المدخلات غير صحيحة', 400);
   console.error('fushati_presence_failed', error instanceof Error ? error.name : 'unknown');
-  return fail('unavailable', 'تعذرت العملية؛ تحقق من اتصال قاعدة البيانات وتطبيق الترحيل 0030', 503);
+  return fail('unavailable', 'تعذرت العملية؛ تحقق من اتصال قاعدة البيانات وتطبيق الترحيل 0033', 503);
 }

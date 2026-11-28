@@ -10,6 +10,7 @@ import {normalizeAgentIdentifier} from './fushati/identifiers.ts';
 import {getFushatiInvite,activateFushatiAdmin} from './fushati/invitations.ts';
 import {parentPhone} from './parent-view.ts';
 import {parentLinkedSchools} from './parent-identities.ts';
+import {recordLoginStamp} from './login-stamps.ts';
 import {verifyAgentEmailChange} from './account-profile.ts';
 import {activationAccount,activateDeputy,safeHtml} from './deputy-invites.ts';
 import type {SchoolRole} from './school-tenancy';
@@ -113,6 +114,8 @@ export async function handleKhotwaAuthentication(request:Request,env:AuthEnv):Pr
  if(path==='/healthz')return {response:Response.json({service:'khotwa',status:'up',auth_revision:AUTH_AUDIT_REVISION},{headers:{'Cache-Control':'no-store'}})};
  // Public webhook access is safe only because the route verifies the Resend Svix signature.
  if(path==='/api/webhooks/resend')return {request:new Request(request,{headers})};
+ // The app asks which version is current before anybody signs in; the answer holds nothing private (app/api/app/version).
+ if(path==='/api/app/version'&&request.method==='GET')return {request:new Request(request,{headers})};
  if(path==='/account/verify-email'){
   if(request.method!=='GET')return {response:new Response('Method Not Allowed',{status:405})};
   if(!env.DB)return {response:new Response('Service unavailable',{status:503})};
@@ -195,6 +198,8 @@ export async function handleKhotwaAuthentication(request:Request,env:AuthEnv):Pr
    }
    if(!claim){await recordFailure(env.DB,limitKey);return {response:loginPage(parentLogin?'/parent':fushatiAdminLogin?'/fushati/admin':fushatiAgentLogin?'/fushati/agent':adminLogin?'/admin':managerLogin?'/manager':'/',true,kind,loginEnglish)};}
    await clearFailures(env.DB,limitKey);
+   // A time stamp of the sign-in (no position, no address). It never blocks the sign-in.
+   if(env.DB)await recordLoginStamp(env.DB,claim,request.headers.get('user-agent'));
    return {response:redirect(parentLogin?'/parent':fushatiAdminLogin?'/fushati/admin':fushatiAgentLogin?'/fushati/agent':adminLogin?'/admin':managerLogin?'/manager':target,sessionCookie(await signToken(secret,claim)))};
   }catch{return {response:new Response('Login service unavailable',{status:503,headers:{'Cache-Control':'no-store'}})};}
  }
@@ -220,6 +225,18 @@ export async function handleKhotwaAuthentication(request:Request,env:AuthEnv):Pr
   if(path.startsWith('/api/'))return {response:Response.json({error:'Authentication required'},{status:401,headers:{'Cache-Control':'no-store'}})};
   return {response:redirect((path.startsWith('/fushati/admin')?'/fushati-admin-login':path.startsWith('/fushati/agent')?'/fushati-agent-login':path==='/parent'?'/parent-login':path==='/manager'?'/manager-login':(path==='/admin'||path.startsWith('/admin/'))?'/admin-login':'/login')+'?return_to='+encodeURIComponent(redirectTarget(path+url.search)))};
  }
+ const signedIn=claim;
+ const identified=()=>{
+  headers.set('oai-authenticated-user-id',signedIn.uid);
+  headers.set('oai-authenticated-user-email',signedIn.e);
+  headers.set('oai-authenticated-user-role',signedIn.role);
+  headers.set('oai-authenticated-user-school-id',signedIn.sid);
+  if(signedIn.phone)headers.set('oai-authenticated-user-parent-phone',signedIn.phone);
+  if(verifiedName||signedIn.role==='parent'){headers.set('oai-authenticated-user-full-name',encodeURIComponent(verifiedName||'ولي الأمر'));headers.set('oai-authenticated-user-full-name-encoding','percent-encoded-utf-8');}
+  return {request:new Request(request,{headers}),school:{schoolId:signedIn.sid,role:signedIn.role,identity:signedIn.uid}};
+ };
+ // Problem reports come from every signed-in role, the read-only manager included, and carry no school data.
+ if(path==='/api/app/report'&&request.method==='POST')return identified();
  if(path==='/account'||path.startsWith('/api/account/')){
   if(claim.role!=='deputy')return {response:path.startsWith('/api/')?Response.json({error:'Student Affairs Agent only'},{status:403}):redirect(claim.role==='manager'?'/manager':claim.role==='parent'?'/parent':'/admin')};
  }
@@ -251,11 +268,5 @@ export async function handleKhotwaAuthentication(request:Request,env:AuthEnv):Pr
   // They must never expose the legacy service's school-wide data to a new school.
   if(claim.sid!=='default'&&(/^\/api\/(?:visitors|messages|desk-close)(?:\/|$)/.test(path)))return {response:Response.json({error:'تتطلب هذه الخدمة الخارجية ربطاً خاصاً بالمدرسة'},{status:403})};
  }
- headers.set('oai-authenticated-user-id',claim.uid);
- headers.set('oai-authenticated-user-email',claim.e);
- headers.set('oai-authenticated-user-role',claim.role);
- headers.set('oai-authenticated-user-school-id',claim.sid);
- if(claim.phone)headers.set('oai-authenticated-user-parent-phone',claim.phone);
- if(verifiedName||claim.role==='parent'){headers.set('oai-authenticated-user-full-name',encodeURIComponent(verifiedName||'ولي الأمر'));headers.set('oai-authenticated-user-full-name-encoding','percent-encoded-utf-8');}
- return {request:new Request(request,{headers}),school:{schoolId:claim.sid,role:claim.role,identity:claim.uid}};
+ return identified();
 }
