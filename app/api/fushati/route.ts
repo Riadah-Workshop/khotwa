@@ -256,7 +256,7 @@ export async function POST(req:Request){
   }
   // Agents and supervisors reach only these, and each one checks the permission on the cafeteria itself.
   if(access.role==='fushati_agent'&&!['create-menu','edit-menu','delete-menu','stock-adjust','review-transfer'].includes(op))return err('ليس لديك صلاحية الإدارة',403);
-  if(['create-cafeteria','delete-cafeteria','edit-cafeteria','deactivate-cafeteria'].includes(op)&&access.role!=='main_admin')return err('اسم المقصف والمدرسة وبيانات البنك يعدلها مدير نظام خطوة فقط. يمكنك إضافة اسم مختصر للمقصف.',403);
+  if(['create-cafeteria','delete-cafeteria','edit-cafeteria','deactivate-cafeteria','activate-cafeteria'].includes(op)&&access.role!=='main_admin')return err('اسم المقصف والمدرسة وبيانات البنك يعدلها مدير نظام خطوة فقط. يمكنك إضافة اسم مختصر للمقصف.',403);
   if(op==='set-alias'){
    const v=parse(data,z.object({id,alias:z.string().trim().max(60)}));
    if(!grantAdministers((await cafeteriaGrants(access)).get(v.id)))return err('المقصف غير متاح',403);
@@ -286,13 +286,13 @@ export async function POST(req:Request){
    ]);
    await audit(access.userId,op,'cafeteria',v.id);return response({ok:true});
   }
-  if(op==='edit-cafeteria'||op==='deactivate-cafeteria'){
+  if(op==='edit-cafeteria'||op==='deactivate-cafeteria'||op==='activate-cafeteria'){
    const v=parse(data,z.object({id, name:name.optional(),bankName:z.string().trim().max(130).optional(),iban:z.string().trim().max(34).optional(),beneficiary:z.string().trim().max(130).optional(),active:flag.optional()}));
    const cafe=await db().prepare('SELECT * FROM fushati_cafeterias WHERE id=?').bind(v.id).first<any>();if(!cafe)return err('المقصف غير موجود',404);
    if(op==='edit-cafeteria'){
     const iban=v.iban??cafe.iban;if(iban&&!/^SA\d{2}[A-Z0-9]{20}$/.test(iban))return err('رقم IBAN غير صالح',400);
     await db().prepare('UPDATE fushati_cafeterias SET name=?,bank_name=?,iban=?,beneficiary=?,active=? WHERE id=?').bind(v.name??cafe.name,v.bankName??cafe.bank_name,iban,v.beneficiary??cafe.beneficiary,v.active===undefined?cafe.active:v.active?1:0,v.id).run();
-   }else await db().prepare('UPDATE fushati_cafeterias SET active=0 WHERE id=?').bind(v.id).run();
+   }else await db().prepare('UPDATE fushati_cafeterias SET active=? WHERE id=?').bind(op==='activate-cafeteria'?1:0,v.id).run();
    await audit(access.userId,op,'cafeteria',v.id);return response({ok:true});
   }
   if(op==='create-user'){
