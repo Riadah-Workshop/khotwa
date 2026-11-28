@@ -1,7 +1,7 @@
 'use client';
 import {useCallback, useEffect, useState} from 'react';
 import type {ReactNode} from 'react';
-import {Archive, Building2, ChartColumn, Check, CircleHelp, DoorOpen, KeyRound, Languages, LayoutGrid, LockKeyhole, LogOut, Pencil, Plus, Power, RefreshCw, School as SchoolIcon, Search, ShieldCheck, ShoppingBasket, Trash2, TriangleAlert, UserPlus, Users, X} from 'lucide-react';
+import {Activity, Archive, Building2, ChartColumn, Check, CircleHelp, DoorOpen, KeyRound, Languages, LayoutGrid, LockKeyhole, LogOut, Pencil, Plus, Power, RefreshCw, School as SchoolIcon, Search, ShieldCheck, ShoppingBasket, Trash2, TriangleAlert, UserPlus, Users, X} from 'lucide-react';
 import {SCHOOL_TABLES} from '../../lib/school-sql';
 import {SAUDI_REGIONS, saudiRegion, saudiCity} from '../../lib/saudi-locations';
 import {SCHOOL_STAGES} from '../../lib/school-stages';
@@ -11,12 +11,13 @@ import {Badge, Card, Chip, EditorView, Empty, Notice, PageHead, Stat, TabPanel, 
 import {ActionMenu} from '../ui/action-menu';
 import type {Tone} from '../ui/kx';
 import {GuidedTour, TourHelpButton, useTour} from '../ui/tour';
+import DiagnosticsPanel from './diagnostics-panel';
 
 type School = {id: string; code: string; name: string; region: string; city: string; stage: string; active: number; studentCount: number; deputyCount: number};
 type Account = {id: string; school_id: string; email: string; full_name: string; role: 'deputy' | 'manager'; active: number; password_set_at: string | null; first_login_at: string | null; invitation_status: string; invitation_error_code: string | null; email_accepted_at: string | null; email_delivered_at: string | null};
 type RecordRow = Record<string, string | number | null>;
 type SchoolDraft = {name: string; code: string; region: string; city: string; stage: string};
-type AdminSection = 'overview' | 'schools' | 'users' | 'cafeteria' | 'records' | 'security';
+type AdminSection = 'overview' | 'schools' | 'users' | 'cafeteria' | 'records' | 'diagnostics' | 'security';
 
 const labels: Record<string, [string, string]> = {students: ['الطلاب', 'Students'], cases: ['الحالات', 'Cases'], contacts: ['التواصل', 'Contacts'], followups: ['المتابعات', 'Follow-ups'], settings: ['الإعدادات', 'Settings'], attendance: ['الحضور', 'Attendance'], attendance_rounds: ['جولات الحضور', 'Attendance rounds'], attendance_audit: ['سجل تدقيق الحضور', 'Attendance audit'], absence_followups: ['متابعة الغياب', 'Absence follow-ups'], absence_events: ['أحداث الغياب', 'Absence events'], case_revisions: ['سجل تغييرات الحالات', 'Case revisions'], parent_grants: ['تصاريح أولياء الأمور', 'Parent grants'], student_families: ['الأسر', 'Student families'], school_trips: ['الرحلات والأنشطة', 'Trips and activities'], school_trip_students: ['مشاركو الرحلات', 'Trip participants'], school_tasks: ['المهام', 'Tasks'], school_evidence: ['الشواهد', 'Evidence'], student_care: ['رعاية الطلاب', 'Student care'], care_intake: ['مدخلات الرعاية', 'Care intake'], desk_closures: ['إغلاقات المكتب', 'Desk closures'], platform_papers: ['أوراق المنصة', 'Platform papers'], compatibility_runs: ['اختبارات التوافق', 'Compatibility runs'], student_movements: ['حركة الطلاب', 'Student movements']};
 const errorCodes: Record<string, [string, string]> = {SMTP_AUTH_FAILED: ['فشل المصادقة لدى Hostinger (SMTP 535)', 'Hostinger authentication failed (SMTP 535)'], SMTP_STAGE_CONNECT: ['فشل اتصال SMTP', 'SMTP connection failed'], SMTP_CONNECTION_FAILED: ['فشل الاتصال بخادم البريد', 'SMTP server connection failed'], SMTP_CONNECTION_TIMEOUT: ['انتهت مهلة اتصال البريد', 'SMTP connection timed out'], SMTP_SENDER_MISMATCH: ['عنوان المرسل غير مطابق لحساب SMTP', 'Sender does not match SMTP account'], EMAIL_SENDER_MISSING: ['لم يُضبط عنوان مرسل البريد', 'Email sender not configured'], SMTP_STAGE_AUTH: ['فشل المصادقة أثناء تسجيل دخول SMTP', 'SMTP authentication step failed'], EMAIL_UNKNOWN_ERROR: ['خطأ غير محدد في البريد؛ راجع Coolify', 'Unspecified mail error; check Coolify logs']};
@@ -126,7 +127,7 @@ export default function AdminConsole({activeSchoolId, tourKey}: {activeSchoolId:
   useEffect(() => { setRows([]); setRecordPage(0); setRecordHasMore(false); }, [recordSchool, table, query]);
 
   const openSection = useCallback((value: string) => {
-    if (['overview', 'schools', 'users', 'cafeteria', 'records', 'security'].includes(value)) setSection(value as AdminSection);
+    if (['overview', 'schools', 'users', 'cafeteria', 'records', 'diagnostics', 'security'].includes(value)) setSection(value as AdminSection);
   }, []);
 
   const activeAccounts = accounts.filter(a => a.active);
@@ -203,6 +204,7 @@ export default function AdminConsole({activeSchoolId, tourKey}: {activeSchoolId:
         {id: 'users', label: t('المستخدمون', 'Users'), icon: <Users size={18}/>, tone: 'blue'},
         {id: 'cafeteria', label: t('المقاصف', 'Cafeterias'), icon: <ShoppingBasket size={18}/>, tone: 'amber'},
         {id: 'records', label: t('السجلات', 'Records'), icon: <Archive size={18}/>, tone: 'red'},
+        {id: 'diagnostics', label: t('التشخيص', 'Diagnostics'), icon: <Activity size={18}/>, tone: 'blue'},
         {id: 'security', label: t('الأمان', 'Security'), icon: <LockKeyhole size={18}/>, tone: 'slate'},
       ]}/>
 
@@ -349,6 +351,10 @@ export default function AdminConsole({activeSchoolId, tourKey}: {activeSchoolId:
             message={t('أعد إدخال رقم الجوال لحذف حساب ولي الأمر نهائيًا:', 'Re-enter the phone number to permanently delete parent access:')}
             confirmLabel={t('احذف نهائياً', 'Delete for good')} cancelLabel={cancelText} onConfirm={() => { void save('delete-parent', {schoolId: selected, phone: parentPhone}); }}/></div>
         </Card>
+      </TabPanel>
+
+      <TabPanel idPrefix="admin" id="diagnostics" active={section === 'diagnostics'}>
+        <div data-tour="admin-diagnostics"><DiagnosticsPanel lang={lang} active={section === 'diagnostics'}/></div>
       </TabPanel>
 
       <TabPanel idPrefix="admin" id="security" active={section === 'security'}>

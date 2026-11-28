@@ -11,6 +11,7 @@
 import {useEffect} from 'react';
 import {decideFix, type Spot} from '../../lib/fushati/location';
 import {watchPosition, type Fix} from '../native/bridge';
+import {notifyDeviceChanged} from '../native/report-client';
 
 const RETRY_AFTER_FAILURE_MS = 60_000;
 const STATUS_REFRESH_MS = 10 * 60_000;
@@ -78,7 +79,7 @@ export default function AutoArrival({language}: {language: 'ar' | 'en'}) {
       if (!(await load()) || !alive) return;
       if (!spots.length) return;
       stopWatching = await watchPosition((fix) => void onFix(fix), {
-        backgroundTitle: language === 'en' ? 'Fushati' : 'فسحتي',
+        onDenied: notifyDeviceChanged, backgroundTitle: language === 'en' ? 'Fushati' : 'فسحتي',
         backgroundMessage: language === 'en' ? 'Arrival and departure at the cafeteria are recorded for attendance.' : 'يُسجَّل وقت الوصول إلى المقصف والمغادرة لأغراض الحضور.',
       });
     };
@@ -91,7 +92,7 @@ export default function AutoArrival({language}: {language: 'ar' | 'en'}) {
       if (before !== spotKey) {
         stopWatching?.();
         stopWatching = null;
-        if (spots.length) stopWatching = await watchPosition((fix) => void onFix(fix), {backgroundTitle: language === 'en' ? 'Fushati' : 'فسحتي', backgroundMessage: language === 'en' ? 'Arrival and departure at the cafeteria are recorded for attendance.' : 'يُسجَّل وقت الوصول إلى المقصف والمغادرة لأغراض الحضور.'});
+        if (spots.length) stopWatching = await watchPosition((fix) => void onFix(fix), {onDenied: notifyDeviceChanged, backgroundTitle: language === 'en' ? 'Fushati' : 'فسحتي', backgroundMessage: language === 'en' ? 'Arrival and departure at the cafeteria are recorded for attendance.' : 'يُسجَّل وقت الوصول إلى المقصف والمغادرة لأغراض الحضور.'});
       }
     }, STATUS_REFRESH_MS);
     return () => {
