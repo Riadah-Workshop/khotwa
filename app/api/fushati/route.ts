@@ -186,6 +186,20 @@ export async function POST(req:Request){
    await audit(access.userId,'rotate-card','account',account.id);
    return response({ok:true,oldCardInvalidated:true});
   }
+  // The quick change a parent makes at drop-off: only the daily limit. The monthly limit, the allowed products and the
+  // purchase switch are untouched (the full form in "Spending rules" is op 'settings'). The limit stays until changed again.
+  if(op==='set-daily-limit'){
+   if(access.role!=='parent')return err('ولي الأمر فقط',403);
+   const v=parse(data,z.object({cafeteriaId:id,studentId:id,dailyLimit:cash}));
+   const cafe=await db().prepare('SELECT school_id FROM fushati_cafeterias WHERE id=? AND active=1').bind(v.cafeteriaId).first<any>();
+   if(!cafe||!await permittedStudent(access.parentPhone,cafe.school_id,v.studentId))return err('طالب غير مرتبط بحسابك',403);
+   const daily=moneyMinor(v.dailyLimit);
+   if(daily===null||daily>10000)return err('الحد اليومي غير صحيح',400);
+   const account=await getOrCreateAccount(cafe.school_id,v.cafeteriaId,v.studentId);if(!account)return err('حساب غير متاح',404);
+   await db().prepare('UPDATE fushati_accounts SET daily_limit_minor=? WHERE id=?').bind(daily,account.id).run();
+   await audit(access.userId,'parent-daily-limit','account',account.id,`${account.daily_limit_minor}->${daily}`);
+   return response({ok:true,dailyLimitMinor:daily});
+  }
   if(op==='settings'){
    if(access.role!=='parent')return err('ولي الأمر فقط',403);
    const v=parse(data,z.object({cafeteriaId:id,studentId:id,dailyLimit:cash,monthlyLimit:cash,allowedItemIds:z.array(id).max(100),active:flag}));

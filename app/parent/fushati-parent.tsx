@@ -1,11 +1,12 @@
 'use client';
 import {useCallback, useEffect, useState} from 'react';
-import type {FormEvent} from 'react';
 import {Check, Clock, Copy, Landmark, Plus, Receipt, RefreshCcw, ScanLine, Settings, ShoppingBasket, TrendingUp, Wallet, X, Printer, ShieldCheck} from 'lucide-react';
 import '../ui/kx.css';
 import './fushati-parent.css';
 import {Badge, Card, Chip, ConfirmButton, Empty, Notice, Stat, TabPanel, Tabs} from '../ui/kx';
 import type {Tone} from '../ui/kx';
+import QuickLimit from './quick-limit';
+import TransferForm from './transfer-form';
 
 type Cafe = {id: string; name: string; bank_name: string; iban: string; beneficiary: string; active: number};
 type FushatiRecord = {schoolId: string; schoolName: string; studentId: string; studentName: string; grade: string; cafeteria: Cafe; balanceMinor: number; dailyLimitMinor: number; monthlyLimitMinor: number; allowedItemIds: string[]; active: number; todaySpentMinor: number; monthSpentMinor: number};
@@ -34,9 +35,6 @@ export default function FushatiParent({schoolId, studentId, language = 'ar', stu
   const [daily, setDaily] = useState('3');
   const [monthly, setMonthly] = useState('0');
   const [active, setActive] = useState(true);
-  const [amount, setAmount] = useState('50');
-  const [reference, setReference] = useState('');
-  const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -114,25 +112,19 @@ export default function FushatiParent({schoolId, studentId, language = 'ar', stu
     await post('rotate-card', {cafeteriaId: record.cafeteria.id, studentId});
     setQrImage('');
   }
-  async function transfer(e: FormEvent) {
-    e.preventDefault();
-    if (!record || !file) return;
-    setError(''); setNotice(''); setBusy(true);
+  // The quick change at the school gate: the daily limit only (see app/parent/quick-limit.tsx).
+  async function saveDaily(dailyLimit: string) {
+    if (!record) return;
+    setBusy(true); setError(''); setNotice('');
     try {
-      const form = new FormData();
-      form.append('cafeteriaId', record.cafeteria.id);
-      form.append('studentId', studentId);
-      form.append('amount', amount);
-      form.append('reference', reference);
-      form.append('file', file);
-      const r = await fetch('/api/fushati/receipts', {method: 'POST', body: form});
+      const r = await fetch('/api/fushati', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({op: 'set-daily-limit', data: {cafeteriaId: record.cafeteria.id, studentId, dailyLimit}})});
       const v = await r.json();
       if (!r.ok) throw new Error(v.error);
-      setNotice(t('تم استلام الإيصال، وسيتغير الرصيد بعد تحقق مدير المقصف من التحويل في البنك.', 'Receipt received. Credit will be applied after the cafeteria administrator verifies the transfer against the bank account.'));
-      setFile(null); setReference('');
-      await loadDetails();
+      const now = money(v.dailyLimitMinor, language);
+      setNotice(t(`الحد اليومي الآن ${now}`, `The daily limit is now ${now}`));
+      await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'تعذر تسجيل الحوالة');
+      setError(e instanceof Error ? e.message : t('تعذر الحفظ', 'Could not save'));
     } finally {
       setBusy(false);
     }
@@ -176,6 +168,8 @@ export default function FushatiParent({schoolId, studentId, language = 'ar', stu
             <Stat icon={<Receipt size={22}/>} tone={pendingCount ? 'violet' : 'slate'} label={t('حوالات قيد المراجعة', 'Transfers in review')} value={pendingCount} hint={pendingCount ? t('بانتظار تحقق المقصف', 'Waiting for the cafeteria') : t('لا شيء معلّق', 'Nothing pending')}/>
           </div>
 
+          <QuickLimit key={`${record.cafeteria.id}:${record.dailyLimitMinor}`} language={language} studentName={studentName || record.studentName} currentMinor={record.dailyLimitMinor} spentTodayMinor={record.todaySpentMinor} busy={busy} disabled={!record.cafeteria.active} onSave={saveDaily}/>
+
           <Tabs idPrefix="fsp" label={t('أقسام المقصف', 'Cafeteria sections')} value={view} onChange={id => onViewChange(id as CafeteriaView)} rtl={language === 'ar'} tourId="fsp-tabs" items={[
             {id: 'topup', label: t('شحن الرصيد', 'Add credit'), icon: <Receipt size={18}/>, tone: 'blue'},
             {id: 'statement', label: t('كشف الحساب', 'Statement'), icon: <RefreshCcw size={18}/>, tone: 'slate', badge: pendingCount},
@@ -195,14 +189,7 @@ export default function FushatiParent({schoolId, studentId, language = 'ar', stu
                 <Notice tone="slate" icon={<ShieldCheck size={18}/>}>{t('لا توجد مدفوعات داخل التطبيق: التحويل يتم مباشرة إلى بنك المقصف.', 'No payments are made inside the app: the transfer goes straight to the cafeteria bank.')}</Notice>
               </Card>
               <Card tone="green" icon={<Receipt size={18}/>} title={t('2. ارفع إيصال التحويل', '2. Upload the transfer receipt')} description={t('يضاف الرصيد بعد أن يتحقق مدير المقصف من التحويل.', 'Credit is added once the cafeteria administrator verifies the transfer.')}>
-                <form className="kx-grid" onSubmit={transfer}>
-                  <div className="kx-form-grid">
-                    <label className="kx-field">{t('المبلغ المحوّل (ر.س)', 'Transfer amount (SAR)')}<input className="kx-input" inputMode="decimal" value={amount} onChange={e => setAmount(e.target.value)} required/></label>
-                    <label className="kx-field">{t('رقم المرجع البنكي', 'Bank reference number')}<input className="kx-input" value={reference} onChange={e => setReference(e.target.value)} minLength={5} maxLength={80} required/></label>
-                  </div>
-                  <label className="kx-field">{t('الإيصال', 'Receipt')}<input className="kx-input" type="file" accept="image/png,image/jpeg,image/webp,application/pdf" onChange={e => setFile(e.target.files?.[0] || null)} required/><small>{t('PNG / JPG / WebP / PDF حتى 4MB', 'PNG / JPG / WebP / PDF up to 4 MB')}</small></label>
-                  <div className="kx-btn-row"><button className="kx-btn is-solid" data-tone="green" disabled={busy || !file || !record.cafeteria.iban || !record.cafeteria.active}><Check size={18}/>{t('رفع الإيصال للمراجعة', 'Submit receipt for approval')}</button></div>
-                </form>
+                <TransferForm language={language} cafeteriaId={record.cafeteria.id} studentId={studentId} disabled={!record.cafeteria.iban || !record.cafeteria.active} onSent={() => { void loadDetails(); }}/>
               </Card>
             </div>
           </TabPanel>
